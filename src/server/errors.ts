@@ -1,3 +1,5 @@
+import type { Config } from './config';
+
 export class ApiError extends Error {
   preserveIdempotency = false;
   constructor(
@@ -25,10 +27,63 @@ export function unavailable(): ApiError {
     5,
   );
 }
+
+const safeFailureCodes = new Set([
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_HAS_EXPIRED',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+  'ERR_OSSL_PEM_NO_START_LINE',
+  'ERR_SSL_PEM_NO_START_LINE',
+  'ERR_INVALID_URL',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  '28000',
+  '28P01',
+  '3D000',
+  '3F000',
+  '42501',
+  '42P01',
+  '53300',
+  '57014',
+  '57P03',
+]);
+
+export function failureCode(error: unknown): string {
+  const seen = new Set<Error>();
+  function inspect(failure: unknown, depth: number): string | undefined {
+    if (!(failure instanceof Error) || depth > 5 || seen.has(failure)) return;
+    seen.add(failure);
+    const code = (failure as Error & { code?: unknown }).code;
+    if (typeof code === 'string' && safeFailureCodes.has(code)) return code;
+    const causeCode = inspect(failure.cause, depth + 1);
+    if (causeCode) return causeCode;
+    if (failure instanceof AggregateError) {
+      for (const nested of failure.errors.slice(0, 8)) {
+        const nestedCode = inspect(nested, depth + 1);
+        if (nestedCode) return nestedCode;
+      }
+    }
+    if (failure.message.includes('Tenant or user not found'))
+      return 'DATABASE_POOLER_USER_NOT_FOUND';
+    if (/connection timeout|timeout exceeded when trying to connect/i.test(failure.message))
+      return 'DATABASE_CONNECTION_TIMEOUT';
+  }
+  return inspect(error, 0) || 'UNKNOWN_FAILURE';
+}
+
 export function logFailure(
   event: string,
   requestId?: string,
   invalidFields?: readonly (keyof Config)[],
+  error?: unknown,
 ) {
   // Never log request bodies, URLs with fragments, SQL parameters, cookies, or raw exception objects.
   console.error(
@@ -37,7 +92,7 @@ export function logFailure(
       request_id: requestId,
       time: new Date().toISOString(),
       ...(invalidFields ? { invalid_fields: invalidFields } : {}),
+      ...(error === undefined ? {} : { error_code: failureCode(error) }),
     }),
   );
 }
-import type { Config } from './config';
