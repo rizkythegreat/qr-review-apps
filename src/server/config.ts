@@ -8,6 +8,7 @@ const key = z
   );
 const schema = z.object({
   PUBLIC_ORIGIN: z.url().refine((v) => {
+    if (!URL.canParse(v)) return false;
     const u = new URL(v);
     return u.protocol === 'https:' && u.origin === v;
   }),
@@ -25,11 +26,18 @@ const schema = z.object({
   STATISTICS_TIMEOUT_MS: z.coerce.number().int().min(20).max(1000).default(150),
 });
 export type Config = z.infer<typeof schema>;
+export class ConfigurationError extends Error {
+  readonly fields: readonly (keyof Config)[];
+  constructor(fields: (keyof Config)[]) {
+    const names = [...new Set(fields)].filter((field) => Object.hasOwn(schema.shape, field));
+    super(`Invalid configuration: ${names.join(', ')}`);
+    this.name = 'ConfigurationError';
+    this.fields = Object.freeze(names);
+  }
+}
 export function readConfig(env: Record<string, string | undefined> = process.env): Config {
   const result = schema.safeParse(env);
   if (!result.success)
-    throw new Error(
-      `Invalid configuration: ${result.error.issues.map((i) => i.path.join('.')).join(', ')}`,
-    );
+    throw new ConfigurationError(result.error.issues.map((issue) => issue.path[0] as keyof Config));
   return result.data;
 }

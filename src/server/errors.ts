@@ -25,7 +25,19 @@ export function unavailable(): ApiError {
     5,
   );
 }
-export function logFailure(event: string, requestId?: string) {
+export function logFailure(
+  event: string,
+  requestId?: string,
+  invalidFields?: readonly (keyof Config)[],
+) {
   // Never log request bodies, URLs with fragments, SQL parameters, cookies, or raw exception objects.
-  console.error(JSON.stringify({ event, request_id: requestId, time: new Date().toISOString() }));
+  console.error(
+    JSON.stringify({
+      event,
+      request_id: requestId,
+      time: new Date().toISOString(),
+      ...(invalidFields ? { invalid_fields: invalidFields } : {}),
+    }),
+  );
 }
+import type { Config } from './config';

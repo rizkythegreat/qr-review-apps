@@ -1,5 +1,5 @@
 import { Application } from './application';
-import { readConfig } from './config';
+import { ConfigurationError, readConfig } from './config';
 import { createPool } from './db';
 import { errorResponse, fallback } from './http';
 import { logFailure, unavailable } from './errors';
@@ -27,18 +27,26 @@ export function getApplication() {
 export async function handleApi(request: Request) {
   try {
     return await getApplication().handle(request);
-  } catch {
+  } catch (error) {
     const id = randomUUID();
-    logFailure('configuration_unavailable', id);
+    logFailure(
+      'configuration_unavailable',
+      id,
+      error instanceof ConfigurationError ? error.fields : undefined,
+    );
     return errorResponse(unavailable(), id);
   }
 }
 export async function handleResolver(request: Request, token: string) {
   try {
     return await getApplication().resolve(request, token);
-  } catch {
+  } catch (error) {
     const id = randomUUID();
-    logFailure('configuration_unavailable', id);
+    logFailure(
+      'configuration_unavailable',
+      id,
+      error instanceof ConfigurationError ? error.fields : undefined,
+    );
     return fallback(
       503,
       'Layanan sementara tidak tersedia. Coba lagi.',
