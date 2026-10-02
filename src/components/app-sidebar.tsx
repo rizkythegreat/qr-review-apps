@@ -1,0 +1,77 @@
+'use client';
+
+// Adapted from the official shadcn/ui dashboard-01 block.
+import Link from 'next/link';
+import type { ComponentProps } from 'react';
+import { LayoutDashboard, Package, QrCode, ShieldQuestion, CircleHelp } from 'lucide-react';
+import { NavMain } from '@/components/nav-main';
+import { NavUser } from '@/components/nav-user';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '@/components/ui/sidebar';
+import { useAdminAuth } from '@/components/providers';
+
+export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
+  const { session } = useAdminAuth();
+  return (
+    <Sidebar collapsible="icon" {...props}>
+      <SidebarHeader className="py-5">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild size="lg">
+              <Link href="/admin">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                  <QrCode className="size-5" />
+                </span>
+                <span className="text-lg font-semibold tracking-tight">
+                  QR <span className="font-normal text-muted-foreground">Review</span>
+                </span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Ruang kerja</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <NavMain
+              items={[
+                { title: 'Dashboard', url: '/admin', icon: <LayoutDashboard /> },
+                { title: 'Batch produksi', url: '/admin/batches', icon: <Package /> },
+                { title: 'Daftar QR', url: '/admin/qr-codes', icon: <QrCode /> },
+                { title: 'Dukungan', url: '/admin/support', icon: <ShieldQuestion /> },
+              ]}
+            />
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Panduan penggunaan">
+                  <Link href="/help">
+                    <CircleHelp />
+                    <span>Panduan penggunaan</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="border-t py-3">
+        <NavUser email={session?.user.email || 'Admin'} />
+      </SidebarFooter>
+    </Sidebar>
+  );
+}

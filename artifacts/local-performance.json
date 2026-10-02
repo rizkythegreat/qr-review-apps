@@ -1,0 +1,11 @@
+{
+  "verified_at": "2026-10-02T15:46:34.240Z",
+  "environment": "local PostgreSQL 15, in-process API",
+  "batch_quantity": 500,
+  "image_format": "png",
+  "size_px": 1024,
+  "batch_ms": 28,
+  "export_ms": 38645,
+  "batch_target_ms": 30000,
+  "export_target_ms": 120000
+}

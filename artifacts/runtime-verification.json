@@ -1,0 +1,34 @@
+{
+  "verified_at": "2026-10-02T15:53:58.546Z",
+  "runtime": "Next.js production build, local PostgreSQL, temporary HTTPS proxy, simulated Supabase Auth with JWT signature verification",
+  "smoke": {
+    "batch": 201,
+    "sale": 201,
+    "activation": 201,
+    "owner_login": 200,
+    "owner_update": 200,
+    "resolver": 302,
+    "durable_visits": 1,
+    "public_zip": 200
+  },
+  "cli": {
+    "migrations": "passed",
+    "admin_allowlist": "passed",
+    "export_worker": "passed",
+    "maintenance": "passed"
+  },
+  "resolver_load": {
+    "requests": 6000,
+    "rate_per_second": 20,
+    "duration_seconds": 300,
+    "sources": 8,
+    "p50_ms": 7,
+    "p95_ms": 9,
+    "p99_ms": 11,
+    "status_counts": {
+      "302": 6000
+    },
+    "traffic_excluded_from_statistics": true
+  },
+  "client_bundle_secrets": "none"
+}

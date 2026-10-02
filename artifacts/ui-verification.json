@@ -1,0 +1,27 @@
+{
+  "verified_at": "2026-10-02T16:09:11.724Z",
+  "runtime": "Real production Next.js, temporary local PostgreSQL, signature-verified Auth simulation, Chromium desktop and mobile",
+  "checks": [
+    "Admin login, invalid credentials/allowlist, protected-route redirect and empty dashboard",
+    "Create batch: committed response lost, identical retry, one batch only",
+    "Separate public/secret exports, worker polling, ZIP download and PNG decode",
+    "QR search and cursor pagination",
+    "Activation blocked before sale, QC, recorded sale and SVG download",
+    "Printed /r URL renders activation, link/PIN field validation, leading-zero PIN",
+    "Owner cookie login, CSRF/ETag profile update, immediate resolver redirect, HEAD, visits",
+    "Version conflict preserves draft, explicit refresh, long store name fits mobile",
+    "PIN change revokes session, old PIN rejected, new PIN login and logout",
+    "Verified PIN reset, secret fragment scrubbed before requests, no secret storage, incomplete link",
+    "Transfer grant, suspended read-only owner, new owner PIN/store and isolated statistics",
+    "Suspend fallback/read-only, resume redirect, irreversible retire and audit trail",
+    "Activation code rotation, damaged stock retirement, secret export invalidation",
+    "Rotated code activates, old code rejected, expired session returns to login",
+    "Persisted credential rate limit displays countdown and disables submit",
+    "Service unavailable state and successful manual retry",
+    "Responsive desktop/mobile, mobile sidebar closes, unknown QR/help/home",
+    "Admin logout removes session and protected data"
+  ],
+  "browser_page_errors": 0,
+  "screenshots": "artifacts/ui/*.png",
+  "real_supabase_data_modified": false
+}

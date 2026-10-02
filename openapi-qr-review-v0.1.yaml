@@ -1,0 +1,3583 @@
+openapi: 3.0.3
+info:
+  title: Akrilik QR Review API
+  version: 0.1.0
+  description: 'Kontrak draft MVP v0.1 berdasarkan PRD 2 Oktober 2026. Bukan API yang sudah diimplementasikan. Endpoint
+    /api/v1 dipakai browser Next.js atau backend pengganti di masa depan; /r/{token} tetap URL publik cetak. Server
+    URL contoh harus diganti domain sendiri.
+
+
+    Admin: Authorization Bearer access token Supabase Auth. Server verifikasi signature, expiry, issuer dan audience
+    lalu periksa role admin dari sumber terpercaya; jangan percaya role user_metadata. Login/logout/refresh Supabase
+    Auth di luar kontrak aplikasi ini. Jangan mengirim secret/service-role key dari browser.
+
+
+    Owner: cookie opaque __Host-owner_session bound ke satu QR, ownership_id dan auth_generation. HttpOnly, Secure,
+    SameSite=Strict, Path=/; expiry 30 menit. API owner pada origin yang sama dengan frontend. Unsafe cookie requests
+    memerlukan Origin allowlisted dan X-CSRF-Token. Public POST login/aktivasi/claim memerlukan Origin allowlisted
+    juga (untuk login CSRF); pembatasan origin tidak menggantikan verifikasi kode/PIN dan bukan bukti kepemilikan.
+    Seluruh endpoint memaksa HTTPS.
+
+
+    Semua body JSON menolak field tak dikenal dan null kecuali schema nullable; input tak ada dan null berbeda.
+    Body maksimal 16 KiB (di luar layanan Auth). Timestamp RFC3339 UTC; id UUID; pin string empat digit termasuk
+    nol awal. Nama trim sebelum panjang divalidasi. Aktivasi kode canonical Base32 16 karakter.
+
+
+    GOOGLE_REVIEW_V1 adalah kebijakan produk: menerima hanya HTTPS exact host g.page dengan path /r/{code}/review
+    (code [A-Za-z0-9_-]{1,200}, tanpa query atau fragment), atau exact host search.google.com, path /local/writereview,
+    satu query placeid ([A-Za-z0-9_-]{1,255}); tanpa query lain atau fragment. Tolak userinfo, port selain default
+    443, trailing-dot host, control characters, percent-encoded path/separator dan host alternatif. Scheme/host
+    dinormalisasi lower-case dan port 443 dihapus; path/ID case-sensitive. Server tidak fetch URL dan tidak mengikuti
+    short-link pada MVP; maps.app.goo.gl, goo.gl/maps, lokasi Maps umum dan host/pola lain: 422 UNSUPPORTED_REVIEW_URL.
+    Kebijakan ini tidak menjamin link masih hidup atau toko benar; sales/owner harus tes tujuan di browser. Format
+    dapat berkembang dengan versi policy baru; bukan klaim semua link Google selalu mempunyai bentuk ini.
+
+
+    Errors JSON: {error:{code,message,details?},request_id}. Tidak ada stack trace, PIN, hash atau kode rahasia.
+    Limit: lima kegagalan kredensial per token+source dalam 15 menit lalu cooldown 15 menit; limit tambahan per
+    sumber dan lintas sumber pada shared store. 429 Retry-After detik. API umum 120 request/menit per principal
+    atau sumber; resolver 300/menit per sumber sebagai default pilot (shared NAT perlu ditinjau). Audit/log tidak
+    menyimpan body sensitif; sumber IP untuk limiter hanya dari proxy terpercaya.
+
+
+    GET list memakai limit 1..100 (default 20), cursor opaque, urutan created_at DESC,id DESC. QR version naik untuk
+    mutasi domain termasuk penerbitan grant dukungan, bukan analytics/sesi login atau pembuatan export; kuat If-Match
+    melindungi lost update. If-Match hilang 428, usang 412. Audit, state dan versi ditulis dalam satu transaksi.
+
+
+    Idempotency-Key UUID wajib pada operasi yang mendefinisikannya. Scope admin user+method+path; public token/grant+method+path.
+    Fingerprint payload dan If-Match dibuat dengan HMAC server; PIN/secret tidak disimpan plaintext dalam rekaman.
+    Setelah auth/origin checks, replay dicek sebelum If-Match/state. Untuk aktivasi/claim, credential yang sudah
+    consumed hanya sah bagi replay key+fingerprint yang tersimpan; jangan menolak replay sukses hanya karena kode/grant
+    telah dikonsumsi. Verifikasi HMAC cocok dengan credential awal dan generation hasil commit; key baru tetap tidak
+    bisa memakai kode/grant consumed. Key sama payload beda 409 IDEMPOTENCY_KEY_REUSED; masih berjalan 409 REQUEST_IN_PROGRESS
+    dengan Retry-After=2. Normal retention 24 jam; dukungan/grant/rotasi yang mengandung secret memakai 15 menit
+    dan encrypted response. Replay sekret yang kedaluwarsa tidak menciptakan grant/kode baru: 410 SECRET_REPLAY_EXPIRED
+    selama tombstone key 24 jam. 4xx tanpa commit tidak menyimpan sukses; key baru diperlukan jika payload diperbaiki.
+    Replay publik setelah generation/ownership/status terkait berubah ditolak 409 QR_STATE_CHANGED, bukan menghidupkan
+    sesi/kode lama. Setelah retention habis, invariant QR/penjualan tetap mencegah duplikasi; batch key expired
+    dapat menciptakan batch baru jadi cek list sebelum retry sangat terlambat.
+
+
+    QR visits adalah durable GET resolver ACTIVE, mengecualikan HEAD, bot yang dikenali dan trafik uji deployment.
+    Tidak dapat membuktikan review terkirim/orang unik. Jangan izinkan query test=true untuk suppress statistik
+    publik. Insert event secara best effort dengan batas waktu terpisah; failure tidak menggagalkan redirect. Timestamp
+    dan ownership_id diambil dari hasil resolve yang sama supaya scan yang bersamaan transfer tidak masuk periode
+    baru secara keliru. Agregasi durable maksimal lag 60 detik; minimal fields ownership_id,total_visits,last_visited_at,as_of.
+    Sesi/secret/reset tidak masuk analytics. Raw scan events retention 90 hari, agregat periode terpisah tidak dihapus
+    saat transfer.
+
+
+    Semua response Cache-Control no-store dan X-Request-Id; /r semua status juga max-age=0. Tidak menerima return_to/destination
+    URL pada resolver. Support UI menangani #grant fragment dan segera menghapus fragment dari address bar; halaman
+    menggunakan Referrer-Policy no-referrer dan tidak memuat analytics pihak ketiga. Secret grant TTL 15 menit dan
+    sekali pakai. Suspend/retire/PIN change/claim mencabut sesi. RETIRED terminal; DAMAGED stock terminal dan otomatis
+    retire QR. Resumption tidak mengembalikan sesi atau grant lama.
+
+    '
+servers:
+- url: https://qr.example.com
+  description: Placeholder produksi; ganti origin sendiri.
+- url: https://localhost:3000
+  description: Dev dengan HTTPS lokal agar Secure cookie berfungsi.
+tags:
+- name: Admin
+- name: Batch
+- name: Inventory
+- name: Support
+- name: Public
+- name: Owner
+- name: Resolver
+paths:
+  /api/v1/admin/me:
+    get:
+      operationId: adminMe
+      summary: Identitas dan peran admin
+      description: JWT Supabase valid tidak otomatis berarti admin. Server memeriksa role/allowlist admin pada data
+        yang tidak dapat diubah pengguna.
+      tags:
+      - Admin
+      security:
+      - AdminBearer: []
+      parameters: []
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMeResponse'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/admin/dashboard:
+    get:
+      operationId: adminDashboard
+      summary: Ringkasan stok dan status QR
+      description: ''
+      tags:
+      - Admin
+      security:
+      - AdminBearer: []
+      parameters: []
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/admin/batches:
+    post:
+      operationId: createBatch
+      summary: Buat batch QR unik
+      description: Semua unit, hash kode dan snapshot terenkripsi rahasia 24 jam dibuat atomik sebelum 201. Tidak
+        mengirim raw code dalam JSON batch. Jika gagal, tidak ada batch parsial. Label tidak harus unik. Status
+        unit GENERATED dan QR UNACTIVATED.
+      tags:
+      - Batch
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchCreate'
+            example:
+              label: Produksi Oktober 2026
+              quantity: 100
+    get:
+      operationId: listBatches
+      summary: Daftar batch
+      description: ''
+      tags:
+      - Batch
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchListResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/admin/batches/{batch_id}:
+    get:
+      operationId: getBatch
+      summary: Detail batch
+      description: ''
+      tags:
+      - Batch
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/BatchId'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/admin/batches/{batch_id}/exports:
+    post:
+      operationId: createExport
+      summary: Antrekan ZIP produksi atau kode rahasia
+      description: 'PUBLIC_QR: ZIP berisi manifest.csv dan QR PNG/SVG URL publik, tanpa kode rahasia. ACTIVATION_CODES:
+        ZIP terpisah berisi activation-codes.csv (token,activation_code). Opsi gambar hanya berlaku PUBLIC_QR; bila
+        disertakan pada ACTIVATION_CODES, 422. Kode rahasia hanya dapat diekspor sebelum snapshot 24 jam berakhir
+        dan sebelum ada unit batch yang aktif, retired atau kodenya dirotasi. Snapshot yang tidak lagi valid: 409
+        ACTIVATION_EXPORT_UNAVAILABLE. Pekerja harus memeriksa ulang sebelum membuat dan mengunduh arsip. Secret
+        tidak melewati URL publik. Jangan memasukkan arsip rahasia ke vendor cetak QR.'
+      tags:
+      - Batch
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/BatchId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJobResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '410':
+          $ref: '#/components/responses/Error410'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportCreate'
+  /api/v1/admin/exports/{export_id}:
+    get:
+      operationId: getExport
+      summary: Status job ekspor
+      description: Polling setiap 2 detik. FAILED tidak membatalkan batch. EXPIRED atau snapshot invalid mengosongkan
+        download_path. Retry job gagal memakai Idempotency-Key baru; retry jaringan memakai key lama.
+      tags:
+      - Batch
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJobResponse'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/admin/exports/{export_id}/download:
+    get:
+      operationId: downloadExport
+      summary: Unduh ZIP melalui server
+      description: 'READY saja; QUEUED/RUNNING/FAILED: 409 EXPORT_NOT_READY; expired: 410 EXPORT_EXPIRED. Semua
+        arsip TTL maksimal 24 jam dari job dan arsip kode tidak melewati TTL snapshot batch. Download diproxy setelah
+        otorisasi; tidak memberikan signed URL publik. Tidak mendukung range/resume pada MVP.'
+      tags:
+      - Batch
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/ExportId'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="qr-public.zip"
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '410':
+          $ref: '#/components/responses/Error410'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/admin/qr-codes:
+    get:
+      operationId: listQr
+      summary: Cari QR dan stok
+      description: ''
+      tags:
+      - Inventory
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      - name: search
+        in: query
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description: Cari exact token atau substring nama toko case-insensitive.
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/QrStatus'
+        description: ''
+      - name: stock_status
+        in: query
+        schema:
+          $ref: '#/components/schemas/StockStatus'
+        description: ''
+      - name: batch_id
+        in: query
+        schema:
+          type: string
+          format: uuid
+        description: ''
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QrAdminListResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/admin/qr-codes/{qr_id}:
+    get:
+      operationId: getQrAdmin
+      summary: Detail QR dan versi
+      description: ''
+      tags:
+      - Inventory
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QrAdminResponse'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/admin/qr-codes/{qr_id}/image:
+    get:
+      operationId: getQrImage
+      summary: Gambar QR publik per unit
+      description: URL yang dikodekan selalu {configured_public_origin}/r/{token}. Quiet zone minimal 4 modul, hitam
+        di atas putih, koreksi error M. SVG menggunakan size_px sebagai dimensi/viewBox dan tidak memuat script
+        atau input HTML.
+      tags:
+      - Inventory
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      - name: format
+        in: query
+        schema:
+          type: string
+          enum:
+          - png
+          - svg
+          default: png
+        description: ''
+      - name: size_px
+        in: query
+        schema:
+          type: integer
+          minimum: 256
+          maximum: 2048
+          default: 1024
+        description: ''
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/svg+xml:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/admin/qr-codes/{qr_id}/stock:
+    patch:
+      operationId: updateStock
+      summary: Catat QC tersedia atau rusak
+      description: 'GENERATED → AVAILABLE atau DAMAGED; AVAILABLE → DAMAGED. QR harus UNACTIVATED. DAMAGED terminal
+        untuk stok, SOLD tidak dapat diubah di sini. Pada DAMAGED server juga mengubah QR ke RETIRED dan mencabut
+        kode; semua dilakukan atomik. Tindakan ke status yang sama: 409 STOCK_TRANSITION_INVALID.'
+      tags:
+      - Inventory
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QrAdminResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '412':
+          $ref: '#/components/responses/Error412'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '428':
+          $ref: '#/components/responses/Error428'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockUpdate'
+  /api/v1/admin/qr-codes/{qr_id}/sales:
+    post:
+      operationId: recordSale
+      summary: Catat unit terjual
+      description: Hanya AVAILABLE + UNACTIVATED. Create sale dan ubah stok SOLD dalam transaksi. Satu sale per
+        QR pada MVP. Reference boleh sama untuk beberapa unit satu transaksi. sold_at tidak boleh di masa depan.
+        Retry idem replay dilakukan sebelum evaluasi If-Match. Tidak ada payment gateway.
+      tags:
+      - Inventory
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaleResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '412':
+          $ref: '#/components/responses/Error412'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '428':
+          $ref: '#/components/responses/Error428'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaleCreate'
+    get:
+      operationId: getSale
+      summary: Detail penjualan unit
+      description: 404 SALE_NOT_FOUND jika QR belum terjual. Kontak dukungan tidak diekspos pada API publik atau
+        owner.
+      tags:
+      - Inventory
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaleResponse'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/admin/qr-codes/{qr_id}/suspend:
+    post:
+      operationId: suspendQr
+      summary: Tangguhkan QR aktif
+      description: ACTIVE → SUSPENDED; status lain 409 QR_TRANSITION_INVALID. Alasan wajib dan audit atomik. Suspend/retire
+        mencabut sesi, seluruh grant tertunda dan kode aktivasi jika relevan. Resume tidak mengembalikan sesi/grant
+        lama. Retire mempertahankan stok dan token historis; token tidak dapat diaktifkan ulang.
+      tags:
+      - Support
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QrAdminResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '412':
+          $ref: '#/components/responses/Error412'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '428':
+          $ref: '#/components/responses/Error428'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAction'
+  /api/v1/admin/qr-codes/{qr_id}/resume:
+    post:
+      operationId: resumeQr
+      summary: Aktifkan kembali QR
+      description: SUSPENDED → ACTIVE; status lain 409 QR_TRANSITION_INVALID. Alasan wajib dan audit atomik. Suspend/retire
+        mencabut sesi, seluruh grant tertunda dan kode aktivasi jika relevan. Resume tidak mengembalikan sesi/grant
+        lama. Retire mempertahankan stok dan token historis; token tidak dapat diaktifkan ulang.
+      tags:
+      - Support
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QrAdminResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '412':
+          $ref: '#/components/responses/Error412'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '428':
+          $ref: '#/components/responses/Error428'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAction'
+  /api/v1/admin/qr-codes/{qr_id}/retire:
+    post:
+      operationId: retireQr
+      summary: Hentikan QR secara permanen
+      description: UNACTIVATED, ACTIVE atau SUSPENDED → RETIRED; status lain 409 QR_TRANSITION_INVALID. Alasan wajib
+        dan audit atomik. Suspend/retire mencabut sesi, seluruh grant tertunda dan kode aktivasi jika relevan. Resume
+        tidak mengembalikan sesi/grant lama. Retire mempertahankan stok dan token historis; token tidak dapat diaktifkan
+        ulang.
+      tags:
+      - Support
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QrAdminResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '412':
+          $ref: '#/components/responses/Error412'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '428':
+          $ref: '#/components/responses/Error428'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAction'
+  /api/v1/admin/qr-codes/{qr_id}/activation-code/rotate:
+    post:
+      operationId: rotateActivationCode
+      summary: Ganti kode aktivasi yang hilang
+      description: Hanya QR UNACTIVATED dengan stok GENERATED, AVAILABLE atau SOLD. Kode lama dibatalkan atomik.
+        Raw kode baru ditampilkan sekali dan disimpan terenkripsi untuk replay request ini maksimal 15 menit. Snapshot
+        ekspor kode batch lama menjadi invalid. Cetak ulang label rahasia. Pin/activation code tidak pernah dapat
+        dibaca lewat GET detail.
+      tags:
+      - Support
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RotatedCodeResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '410':
+          $ref: '#/components/responses/Error410'
+        '412':
+          $ref: '#/components/responses/Error412'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '428':
+          $ref: '#/components/responses/Error428'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAction'
+  /api/v1/admin/qr-codes/{qr_id}/pin-reset-grants:
+    post:
+      operationId: createPinResetGrant
+      summary: Terbitkan reset PIN
+      description: 'Hanya ACTIVE atau SUSPENDED; wajib referensi verifikasi pemilik oleh admin. Grant random 32
+        byte, sekali pakai, kedaluwarsa 15 menit. Semua grant lama pada QR dibatalkan. QR/link/status tidak berubah
+        saat grant dibuat; sesi owner lama dicabut saat claim berhasil. Raw secret hanya dalam claim_url dengan
+        fragment #grant=...; response replay disimpan terenkripsi maksimal 15 menit. Server tidak mengirim pesan
+        kepada pemilik; admin membagikan link melalui proses dukungan di luar API.'
+      tags:
+      - Support
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportGrantResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '410':
+          $ref: '#/components/responses/Error410'
+        '412':
+          $ref: '#/components/responses/Error412'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '428':
+          $ref: '#/components/responses/Error428'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportGrantCreate'
+  /api/v1/admin/qr-codes/{qr_id}/transfer-grants:
+    post:
+      operationId: createTransferGrant
+      summary: Terbitkan pengalihan kepemilikan
+      description: 'Hanya ACTIVE atau SUSPENDED; wajib referensi verifikasi pemilik oleh admin. Grant random 32
+        byte, sekali pakai, kedaluwarsa 15 menit. Semua grant lama pada QR dibatalkan. Create grant dan suspend
+        QR atomik. Semua sesi owner dicabut segera. Claim valid membuat periode kepemilikan baru dan mengaktifkan
+        QR; jika grant kedaluwarsa QR tetap suspend sampai bantuan admin. Raw secret hanya dalam claim_url dengan
+        fragment #grant=...; response replay disimpan terenkripsi maksimal 15 menit. Server tidak mengirim pesan
+        kepada pemilik; admin membagikan link melalui proses dukungan di luar API.'
+      tags:
+      - Support
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportGrantResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '410':
+          $ref: '#/components/responses/Error410'
+        '412':
+          $ref: '#/components/responses/Error412'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '428':
+          $ref: '#/components/responses/Error428'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportGrantCreate'
+  /api/v1/admin/qr-codes/{qr_id}/audit-events:
+    get:
+      operationId: listAuditEvents
+      summary: Riwayat perubahan QR
+      description: ''
+      tags:
+      - Support
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventListResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/public/qr/{token}:
+    get:
+      operationId: getPublicQr
+      summary: Metadata aman untuk flow aktivasi
+      description: Tidak mencatat kunjungan. activation_allowed true hanya UNACTIVATED + SOLD. Resource RETIRED
+        tetap mengembalikan metadata 200 dengan false; resolver /r memakai 410. Tidak mengembalikan hash, URL tujuan,
+        sale, kode atau statistik.
+      tags:
+      - Public
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Token'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicQrResponse'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/public/qr/{token}/activate:
+    post:
+      operationId: activateQr
+      summary: Aktifkan unit toko
+      description: 'Memerlukan UNACTIVATED + SOLD dan kode benar. Kode salah: 401 INVALID_ACTIVATION_CODE. Stok
+        belum SOLD: 409 QR_NOT_SOLD; sudah aktif: 409 QR_ALREADY_ACTIVE; retired: 410 QR_RETIRED. Hash PIN, konsumsi
+        kode, simpan toko dan buat ownership_id pertama atomik. Tidak membuat cookie; pemilik login via /owner/sessions.
+        Aktivasi paralel hanya satu sukses. Retry key+payload yang sama mereplay hasil committed bila ownership/state
+        belum berubah; jika berubah 409 QR_STATE_CHANGED. Key baru setelah aktif bukan replay.'
+      tags:
+      - Public
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Token'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/Origin'
+      responses:
+        '201':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivationResultResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '410':
+          $ref: '#/components/responses/Error410'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivationRequest'
+            example:
+              activation_code: MZXW6YTBOI2DEZLG
+              store_name: Kopi Bahagia
+              review_url: https://g.page/r/EXAMPLECODE/review
+              pin: '0427'
+              pin_confirmation: '0427'
+  /api/v1/owner/sessions:
+    post:
+      operationId: createOwnerSession
+      summary: Login pemilik dengan token dan PIN
+      description: 'Tidak ada login akun owner. Token tidak dikenal, PIN salah atau QR belum aktif: 401 INVALID_CREDENTIALS
+        dengan pesan sama. RETIRED tidak boleh login (pesan sama). ACTIVE mendapat read_only=false; SUSPENDED mendapat
+        true. Limiter menormalkan timing dan pesan untuk kredensial tidak valid. Masa sesi 30 menit absolut tanpa
+        sliding refresh. Login mengganti sesi owner browser; raw token sesi hanya cookie, tidak body.'
+      tags:
+      - Owner
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Origin'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            Set-Cookie:
+              description: __Host-owner_session=<opaque>; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=1800.
+                Login mengganti sesi owner pada browser ini. Tidak ada Domain. Response logout/PIN change menghapus
+                cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerSessionResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnerLogin'
+            example:
+              token: 7kR9mT2vX4pN6sQ8wY0zBA
+              pin: '0427'
+  /api/v1/owner/me:
+    get:
+      operationId: ownerMe
+      summary: Sesi dan detail QR saat ini
+      description: 'Mengambil QR yang terikat sesi; tidak menerima qr_id/token pada input. Mengembalikan csrf_token
+        untuk pemulihan state UI. Jika QR retired/sesi dicabut/expired: 401 SESSION_EXPIRED. Saat suspend, hanya
+        sesi login baru read-only yang valid.'
+      tags:
+      - Owner
+      security:
+      - OwnerCookie: []
+      parameters: []
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerSessionResponse'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+    patch:
+      operationId: updateOwnerQr
+      summary: Ubah nama toko atau link review
+      description: Minimal satu field. QR bound to cookie; tidak boleh menerima id/token/status/stock pada body.
+        Hanya ACTIVE. Update atomik dan audit; version bertambah. PIN, token dan ownership tidak berubah.
+      tags:
+      - Owner
+      security:
+      - OwnerCookie: []
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/Origin'
+      - $ref: '#/components/parameters/Csrf'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            ETag:
+              description: Versi QR resource; format strong ETag seperti "v7". Gunakan persis pada If-Match.
+              schema:
+                type: string
+                example: '"v7"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerQrResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '412':
+          $ref: '#/components/responses/Error412'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '423':
+          $ref: '#/components/responses/Error423'
+        '428':
+          $ref: '#/components/responses/Error428'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnerUpdate'
+            example:
+              review_url: https://g.page/r/NEWEXAMPLECODE/review
+  /api/v1/owner/me/stats:
+    get:
+      operationId: ownerStats
+      summary: Statistik periode pemilik saat ini
+      description: Total durable visits dan last_visited_at pada ownership_id saat ini. Dapat dibaca saat suspend.
+        Angka bisa tertunda maksimal 60 detik; as_of menjelaskan kesegaran, kegagalan pencatatan bisa undercount.
+        Bukan jumlah review atau orang unik.
+      tags:
+      - Owner
+      security:
+      - OwnerCookie: []
+      parameters: []
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/owner/me/pin:
+    post:
+      operationId: changeOwnerPin
+      summary: Ganti PIN dan cabut sesi
+      description: 'Hanya ACTIVE. PIN lama salah: 401 INVALID_CREDENTIALS, turut dihitung limiter. PIN baru harus
+        berbeda; konfirmasi cocok. Hash berubah, auth_generation naik, semua sesi dan grant pending dicabut atomik.
+        Hapus cookie; login ulang dengan PIN baru. Tidak mendukung idem/replay sukses; bila respons hilang, coba
+        login PIN baru.'
+      tags:
+      - Owner
+      security:
+      - OwnerCookie: []
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/Origin'
+      - $ref: '#/components/parameters/Csrf'
+      responses:
+        '204':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            Set-Cookie:
+              description: __Host-owner_session=<opaque>; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=1800.
+                Login mengganti sesi owner pada browser ini. Tidak ada Domain. Response logout/PIN change menghapus
+                cookie.
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '412':
+          $ref: '#/components/responses/Error412'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '423':
+          $ref: '#/components/responses/Error423'
+        '428':
+          $ref: '#/components/responses/Error428'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PinChange'
+            example:
+              current_pin: '0427'
+              new_pin: '1938'
+              new_pin_confirmation: '1938'
+  /api/v1/owner/session/logout:
+    post:
+      operationId: logoutOwner
+      summary: Keluar dari sesi owner
+      description: 'Sesi valid: validasi Origin/CSRF lalu cabut sesi dan hapus cookie. Sesi hilang/expired: tetap
+        204 dan hapus cookie dengan Origin valid; CSRF boleh diabaikan karena tidak ada sesi. Logout tidak mengganti
+        PIN. Operasi idempotent tanpa Idempotency-Key.'
+      tags:
+      - Owner
+      security:
+      - {}
+      - OwnerCookie: []
+      parameters:
+      - $ref: '#/components/parameters/Origin'
+      - $ref: '#/components/parameters/Csrf'
+      responses:
+        '204':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            Set-Cookie:
+              description: __Host-owner_session=<opaque>; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=1800.
+                Login mengganti sesi owner pada browser ini. Tidak ada Domain. Response logout/PIN change menghapus
+                cookie.
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Error400'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+  /api/v1/public/pin-reset/claim:
+    post:
+      operationId: claimPinReset
+      summary: Selesaikan reset PIN
+      description: 'Grant_token berasal dari fragment UI dan dikirim hanya melalui POST; tidak masuk URL request.
+        Kode salah, expired, revoked, wrong kind atau sudah dipakai: 410 GRANT_INVALID_OR_EXPIRED (pesan sama).
+        Validasi konfirmasi/URL sebelum konsumsi; claim serta hash PIN baru/audit/auth_generation atomik. Cabut
+        seluruh sesi dan grant QR. Pertahankan URL, ownership_id dan status ACTIVE/SUSPENDED; login read-only jika
+        suspended. Tidak membuat cookie. Replay key+payload sama hanya selama 15 menit dan jika state credential/ownership
+        masih hasil claim; perubahan berikutnya 409 QR_STATE_CHANGED.'
+      tags:
+      - Public
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/Origin'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResultResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '410':
+          $ref: '#/components/responses/Error410'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantClaim'
+  /api/v1/public/ownership-transfer/claim:
+    post:
+      operationId: claimOwnershipTransfer
+      summary: Selesaikan pengalihan toko
+      description: 'Grant_token berasal dari fragment UI dan dikirim hanya melalui POST; tidak masuk URL request.
+        Kode salah, expired, revoked, wrong kind atau sudah dipakai: 410 GRANT_INVALID_OR_EXPIRED (pesan sama).
+        Validasi konfirmasi/URL sebelum konsumsi; claim serta hash PIN baru/audit/auth_generation atomik. Cabut
+        seluruh sesi dan grant QR. Memerlukan QR SUSPENDED dan generation yang terikat grant. Tutup ownership lama,
+        buat ownership baru, simpan toko/URL/PIN dan status ACTIVE. Statistik pemilik baru dimulai nol; riwayat
+        tetap ada. Tidak membuat cookie. Replay key+payload sama hanya selama 15 menit dan jika state credential/ownership
+        masih hasil claim; perubahan berikutnya 409 QR_STATE_CHANGED.'
+      tags:
+      - Public
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/Origin'
+      responses:
+        '200':
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResultResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '410':
+          $ref: '#/components/responses/Error410'
+        '415':
+          $ref: '#/components/responses/Error415'
+        '422':
+          $ref: '#/components/responses/Error422'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+        '413':
+          $ref: '#/components/responses/Error413'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferClaim'
+  /r/{token}:
+    get:
+      operationId: resolveQr
+      summary: Scan QR publik
+      description: 'ACTIVE: 302 sementara ke review_url. UNACTIVATED: 200 halaman belum aktif, form hanya jika SOLD.
+        SUSPENDED: 200 fallback tanpa tujuan Google. RETIRED: 410 fallback. Tidak dikenal: 404. DB gagal: 503 coba
+        lagi, tidak membuka aktivasi. HEAD mempunyai status/header yang sama tanpa body dan tidak dicatat. Preview
+        tujuan gunakan URL dari halaman kelola langsung, bukan resolver. Semua response no-store, max-age=0; analytics
+        tidak boleh menentukan apakah redirect berhasil.'
+      tags:
+      - Resolver
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Token'
+      responses:
+        '200':
+          description: Halaman belum aktif atau ditangguhkan.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            text/html:
+              schema:
+                type: string
+                description: HTML halaman Next.js berbahasa Indonesia; bukan JSON.
+        '302':
+          description: QR aktif; pindah ke Google Review, tanpa body.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            Location:
+              description: Review URL tersimpan yang sudah divalidasi; tidak menerima redirect query.
+              schema:
+                $ref: '#/components/schemas/ReviewUrl'
+        '404':
+          description: QR tidak ditemukan.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            text/html:
+              schema:
+                type: string
+                description: HTML halaman Next.js berbahasa Indonesia; bukan JSON.
+        '410':
+          description: QR retired.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            text/html:
+              schema:
+                type: string
+                description: HTML halaman Next.js berbahasa Indonesia; bukan JSON.
+        '429':
+          description: Terlalu banyak request.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            text/html:
+              schema:
+                type: string
+                description: HTML halaman Next.js berbahasa Indonesia; bukan JSON.
+        '503':
+          description: Database/resolver tidak tersedia; coba lagi.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+                example: 5
+          content:
+            text/html:
+              schema:
+                type: string
+                description: HTML halaman Next.js berbahasa Indonesia; bukan JSON.
+    head:
+      operationId: headQr
+      summary: Periksa QR tanpa hitungan
+      description: 'ACTIVE: 302 sementara ke review_url. UNACTIVATED: 200 halaman belum aktif, form hanya jika SOLD.
+        SUSPENDED: 200 fallback tanpa tujuan Google. RETIRED: 410 fallback. Tidak dikenal: 404. DB gagal: 503 coba
+        lagi, tidak membuka aktivasi. HEAD mempunyai status/header yang sama tanpa body dan tidak dicatat. Preview
+        tujuan gunakan URL dari halaman kelola langsung, bukan resolver. Semua response no-store, max-age=0; analytics
+        tidak boleh menentukan apakah redirect berhasil.'
+      tags:
+      - Resolver
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Token'
+      responses:
+        '200':
+          description: Halaman belum aktif atau ditangguhkan.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+        '302':
+          description: QR aktif; pindah ke Google Review, tanpa body.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            Location:
+              description: Review URL tersimpan yang sudah divalidasi; tidak menerima redirect query.
+              schema:
+                $ref: '#/components/schemas/ReviewUrl'
+        '404':
+          description: QR tidak ditemukan.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+        '410':
+          description: QR retired.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+        '429':
+          description: Terlalu banyak request.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+        '503':
+          description: Database/resolver tidak tersedia; coba lagi.
+          headers:
+            Cache-Control:
+              description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0.
+                CDN harus bypass cache.'
+              schema:
+                type: string
+                example: no-store, max-age=0
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+            Retry-After:
+              schema:
+                type: integer
+                minimum: 1
+                example: 5
+components:
+  securitySchemes:
+    AdminBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: Supabase JWT
+      description: User access token valid plus authorization ADMIN; bukan service-role key.
+    OwnerCookie:
+      type: apiKey
+      in: cookie
+      name: __Host-owner_session
+      description: Opaque session bound satu QR; dibentuk melalui login PIN.
+  parameters:
+    Token:
+      name: token
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/PublicToken'
+    QrId:
+      name: qr_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    BatchId:
+      name: batch_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ExportId:
+      name: export_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+        maxLength: 1024
+      description: 'Opaque cursor. Sort created_at DESC, id DESC; filter terikat cursor. Cursor salah atau filter
+        berubah: 400 INVALID_CURSOR.'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: 'UUID acak per operasi. Payload/key mismatch: 409. Normal retention 24 jam; support grant/rotasi
+        secret 15 menit. Tidak digunakan untuk login atau PIN change.'
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        type: string
+        pattern: ^"v[1-9][0-9]*"$
+      description: Strong ETag resource dari GET. Hilang 428; versi usang 412. Evaluasi atomik bersama mutasi.
+    Csrf:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 32
+      description: Token dari login atau GET /owner/me. Harus cocok dengan sesi. Origin juga diperiksa.
+    Origin:
+      name: Origin
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uri
+      description: 'Harus persis origin deployment terkonfigurasi. Berlaku pada seluruh public POST dan owner mutasi;
+        origin lain atau hilang: 403. CLI/Postman menyetelnya eksplisit.'
+  schemas:
+    PublicToken:
+      type: string
+      pattern: ^[A-Za-z0-9_-]{22}$
+      example: 7kR9mT2vX4pN6sQ8wY0zBA
+      description: Base64url tanpa padding dari 16 byte random kriptografis; lookup case-sensitive.
+    Pin:
+      type: string
+      pattern: ^[0-9]{4}$
+      writeOnly: true
+      example: '0427'
+    ActivationCode:
+      type: string
+      pattern: ^[A-Z2-7]{16}$
+      writeOnly: true
+      example: MZXW6YTBOI2DEZLG
+      description: 16 karakter Base32 random independen; client menghapus spasi/tanda hubung dan mengubah menjadi
+        uppercase sebelum dikirim.
+    ReviewUrl:
+      type: string
+      format: uri
+      maxLength: 2048
+      example: https://g.page/r/EXAMPLECODE/review
+      description: Hanya HTTPS; pola link review yang ditetapkan dalam info.description. Contoh dummy, bukan toko
+        nyata.
+    QrStatus:
+      type: string
+      enum:
+      - UNACTIVATED
+      - ACTIVE
+      - SUSPENDED
+      - RETIRED
+    StockStatus:
+      type: string
+      enum:
+      - GENERATED
+      - AVAILABLE
+      - SOLD
+      - DAMAGED
+    Error:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              enum:
+              - MALFORMED_JSON
+              - INVALID_CURSOR
+              - INVALID_PARAMETER
+              - UNAUTHENTICATED
+              - SESSION_EXPIRED
+              - INVALID_CREDENTIALS
+              - INVALID_ACTIVATION_CODE
+              - FORBIDDEN
+              - ORIGIN_NOT_ALLOWED
+              - CSRF_INVALID
+              - RESOURCE_NOT_FOUND
+              - SALE_NOT_FOUND
+              - STATE_CONFLICT
+              - IDEMPOTENCY_KEY_REUSED
+              - REQUEST_IN_PROGRESS
+              - QR_STATE_CHANGED
+              - QR_NOT_SOLD
+              - QR_ALREADY_ACTIVE
+              - QR_TRANSITION_INVALID
+              - STOCK_TRANSITION_INVALID
+              - ACTIVATION_EXPORT_UNAVAILABLE
+              - EXPORT_NOT_READY
+              - QR_RETIRED
+              - GRANT_INVALID_OR_EXPIRED
+              - EXPORT_EXPIRED
+              - SECRET_REPLAY_EXPIRED
+              - VERSION_MISMATCH
+              - PAYLOAD_TOO_LARGE
+              - UNSUPPORTED_MEDIA_TYPE
+              - VALIDATION_ERROR
+              - UNSUPPORTED_REVIEW_URL
+              - PIN_CONFIRMATION_MISMATCH
+              - QR_SUSPENDED
+              - PRECONDITION_REQUIRED
+              - RATE_LIMITED
+              - INTERNAL_ERROR
+              - SERVICE_UNAVAILABLE
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                properties:
+                  field:
+                    type: string
+                  code:
+                    type: string
+                  message:
+                    type: string
+                required:
+                - field
+                - code
+                - message
+          required:
+          - code
+          - message
+        request_id:
+          type: string
+      required:
+      - error
+      - request_id
+    Pagination:
+      type: object
+      additionalProperties: false
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - limit
+      - next_cursor
+    Batch:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+          minLength: 1
+          maxLength: 120
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 500
+        created_at:
+          type: string
+          format: date-time
+        activation_codes_expires_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - label
+      - quantity
+      - created_at
+      - activation_codes_expires_at
+    BatchCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 120
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 500
+      required:
+      - label
+      - quantity
+    ExportCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum:
+          - PUBLIC_QR
+          - ACTIVATION_CODES
+        image_format:
+          type: string
+          enum:
+          - png
+          - svg
+          default: png
+        size_px:
+          type: integer
+          minimum: 256
+          maximum: 2048
+          default: 1024
+      required:
+      - kind
+    ExportJob:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        batch_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - PUBLIC_QR
+          - ACTIVATION_CODES
+        status:
+          type: string
+          enum:
+          - QUEUED
+          - RUNNING
+          - READY
+          - FAILED
+          - EXPIRED
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        download_path:
+          type: string
+          nullable: true
+        failure_code:
+          type: string
+          nullable: true
+      required:
+      - id
+      - batch_id
+      - kind
+      - status
+      - created_at
+      - expires_at
+      - download_path
+      - failure_code
+    QrAdmin:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        batch_id:
+          type: string
+          format: uuid
+        token:
+          $ref: '#/components/schemas/PublicToken'
+        public_url:
+          type: string
+          format: uri
+        status:
+          $ref: '#/components/schemas/QrStatus'
+        stock_status:
+          $ref: '#/components/schemas/StockStatus'
+        store_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: Kopi Bahagia
+          description: Trim whitespace tepi; panjang dihitung setelah trim.
+          nullable: true
+        review_url:
+          type: string
+          format: uri
+          maxLength: 2048
+          example: https://g.page/r/EXAMPLECODE/review
+          description: Hanya HTTPS; pola link review yang ditetapkan dalam info.description. Contoh dummy, bukan
+            toko nyata.
+          nullable: true
+        version:
+          type: integer
+          minimum: 1
+        ownership_id:
+          type: string
+          format: uuid
+          nullable: true
+        activated_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - batch_id
+      - token
+      - public_url
+      - status
+      - stock_status
+      - store_name
+      - review_url
+      - version
+      - ownership_id
+      - activated_at
+      - created_at
+      - updated_at
+    PublicQr:
+      type: object
+      additionalProperties: false
+      properties:
+        token:
+          $ref: '#/components/schemas/PublicToken'
+        status:
+          $ref: '#/components/schemas/QrStatus'
+        activation_allowed:
+          type: boolean
+        manage_path:
+          type: string
+          example: /manage
+        supported_review_link_policy:
+          type: string
+          enum:
+          - GOOGLE_REVIEW_V1
+      required:
+      - token
+      - status
+      - activation_allowed
+      - manage_path
+      - supported_review_link_policy
+    ActivationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        activation_code:
+          $ref: '#/components/schemas/ActivationCode'
+        store_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: Kopi Bahagia
+          description: Trim whitespace tepi; panjang dihitung setelah trim.
+        review_url:
+          $ref: '#/components/schemas/ReviewUrl'
+        pin:
+          $ref: '#/components/schemas/Pin'
+        pin_confirmation:
+          $ref: '#/components/schemas/Pin'
+      required:
+      - activation_code
+      - store_name
+      - review_url
+      - pin
+      - pin_confirmation
+    ActivationResult:
+      type: object
+      additionalProperties: false
+      properties:
+        token:
+          $ref: '#/components/schemas/PublicToken'
+        status:
+          type: string
+          enum:
+          - ACTIVE
+        store_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: Kopi Bahagia
+          description: Trim whitespace tepi; panjang dihitung setelah trim.
+        manage_url:
+          type: string
+          format: uri
+        activated_at:
+          type: string
+          format: date-time
+      required:
+      - token
+      - status
+      - store_name
+      - manage_url
+      - activated_at
+    OwnerLogin:
+      type: object
+      additionalProperties: false
+      properties:
+        token:
+          $ref: '#/components/schemas/PublicToken'
+        pin:
+          $ref: '#/components/schemas/Pin'
+      required:
+      - token
+      - pin
+    OwnerQr:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        token:
+          $ref: '#/components/schemas/PublicToken'
+        status:
+          $ref: '#/components/schemas/QrStatus'
+        store_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: Kopi Bahagia
+          description: Trim whitespace tepi; panjang dihitung setelah trim.
+        review_url:
+          $ref: '#/components/schemas/ReviewUrl'
+        version:
+          type: integer
+          minimum: 1
+        ownership_id:
+          type: string
+          format: uuid
+        activated_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - token
+      - status
+      - store_name
+      - review_url
+      - version
+      - ownership_id
+      - activated_at
+      - updated_at
+    OwnerSession:
+      type: object
+      additionalProperties: false
+      properties:
+        qr:
+          $ref: '#/components/schemas/OwnerQr'
+        expires_at:
+          type: string
+          format: date-time
+        csrf_token:
+          type: string
+          minLength: 32
+          description: Random terikat sesi; gunakan X-CSRF-Token untuk mutasi cookie. Jangan log.
+        read_only:
+          type: boolean
+      required:
+      - qr
+      - expires_at
+      - csrf_token
+      - read_only
+    OwnerUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        store_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: Kopi Bahagia
+          description: Trim whitespace tepi; panjang dihitung setelah trim.
+        review_url:
+          $ref: '#/components/schemas/ReviewUrl'
+      required: []
+      minProperties: 1
+    PinChange:
+      type: object
+      additionalProperties: false
+      properties:
+        current_pin:
+          $ref: '#/components/schemas/Pin'
+        new_pin:
+          $ref: '#/components/schemas/Pin'
+        new_pin_confirmation:
+          $ref: '#/components/schemas/Pin'
+      required:
+      - current_pin
+      - new_pin
+      - new_pin_confirmation
+    Stats:
+      type: object
+      additionalProperties: false
+      properties:
+        ownership_id:
+          type: string
+          format: uuid
+        total_visits:
+          type: integer
+          format: int64
+          minimum: 0
+        last_visited_at:
+          type: string
+          format: date-time
+          nullable: true
+        as_of:
+          type: string
+          format: date-time
+        metric:
+          type: string
+          enum:
+          - QR_VISITS
+        counts_submitted_reviews:
+          type: boolean
+          enum:
+          - false
+      required:
+      - ownership_id
+      - total_visits
+      - last_visited_at
+      - as_of
+      - metric
+      - counts_submitted_reviews
+    StockUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        stock_status:
+          type: string
+          enum:
+          - AVAILABLE
+          - DAMAGED
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 500
+          example: Pemilik meminta pemulihan setelah PIN terlupa.
+      required:
+      - stock_status
+      - reason
+    SaleCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        reference:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: SALE-20261002-001
+        sold_at:
+          type: string
+          format: date-time
+        buyer_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        support_contact:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Opsional, bukan kontak yang sudah diverifikasi.
+      required:
+      - reference
+      - sold_at
+    Sale:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        qr_id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+        sold_at:
+          type: string
+          format: date-time
+        buyer_name:
+          type: string
+          nullable: true
+        support_contact:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - qr_id
+      - reference
+      - sold_at
+      - buyer_name
+      - support_contact
+      - created_at
+    AdminAction:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 500
+          example: Pemilik meminta pemulihan setelah PIN terlupa.
+      required:
+      - reason
+    SupportGrantCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 500
+          example: Pemilik meminta pemulihan setelah PIN terlupa.
+        verification_reference:
+          type: string
+          minLength: 5
+          maxLength: 200
+          example: SUPPORT-20261002-001
+          description: Referensi pemeriksaan bukti; jangan menaruh foto/dokumen pribadi dalam field ini.
+      required:
+      - reason
+      - verification_reference
+    SupportGrant:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        qr_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - PIN_RESET
+          - OWNERSHIP_TRANSFER
+        expires_at:
+          type: string
+          format: date-time
+        claim_url:
+          type: string
+          format: uri
+        qr_version:
+          type: integer
+          minimum: 1
+      required:
+      - id
+      - qr_id
+      - kind
+      - expires_at
+      - claim_url
+      - qr_version
+      description: claim_url memuat secret sekali pakai dalam fragment. Tampilkan hanya kepada admin berwenang;
+        tidak boleh masuk analytics/log.
+    GrantClaim:
+      type: object
+      additionalProperties: false
+      properties:
+        grant_token:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{43}$
+          writeOnly: true
+        new_pin:
+          $ref: '#/components/schemas/Pin'
+        new_pin_confirmation:
+          $ref: '#/components/schemas/Pin'
+      required:
+      - grant_token
+      - new_pin
+      - new_pin_confirmation
+    TransferClaim:
+      type: object
+      additionalProperties: false
+      properties:
+        grant_token:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{43}$
+          writeOnly: true
+        store_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: Kopi Bahagia
+          description: Trim whitespace tepi; panjang dihitung setelah trim.
+        review_url:
+          $ref: '#/components/schemas/ReviewUrl'
+        new_pin:
+          $ref: '#/components/schemas/Pin'
+        new_pin_confirmation:
+          $ref: '#/components/schemas/Pin'
+      required:
+      - grant_token
+      - store_name
+      - review_url
+      - new_pin
+      - new_pin_confirmation
+    ClaimResult:
+      type: object
+      additionalProperties: false
+      properties:
+        token:
+          $ref: '#/components/schemas/PublicToken'
+        status:
+          $ref: '#/components/schemas/QrStatus'
+        manage_url:
+          type: string
+          format: uri
+        completed_at:
+          type: string
+          format: date-time
+      required:
+      - token
+      - status
+      - manage_url
+      - completed_at
+    RotatedCode:
+      type: object
+      additionalProperties: false
+      properties:
+        qr_id:
+          type: string
+          format: uuid
+        activation_code:
+          type: string
+          pattern: ^[A-Z2-7]{16}$
+          description: Rahasia baru ditampilkan pada response ini; jangan log.
+        version:
+          type: integer
+          minimum: 1
+      required:
+      - qr_id
+      - activation_code
+      - version
+      description: Print label rahasia baru. Token publik dan QR cetak tetap sama.
+    AuditEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        qr_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        actor_type:
+          type: string
+          enum:
+          - ADMIN
+          - OWNER
+          - SYSTEM
+        actor_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          nullable: true
+        changes:
+          type: object
+          additionalProperties: true
+          description: Hanya perubahan nonrahasia; tidak ada PIN, kode, grant, cookie atau key.
+      required:
+      - id
+      - qr_id
+      - action
+      - actor_type
+      - actor_id
+      - created_at
+      - reason
+      - changes
+    AdminMe:
+      type: object
+      additionalProperties: false
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum:
+          - ADMIN
+      required:
+      - user_id
+      - role
+    Dashboard:
+      type: object
+      additionalProperties: false
+      properties:
+        total_units:
+          type: integer
+          minimum: 0
+        qr_counts:
+          type: object
+          additionalProperties: false
+          properties:
+            UNACTIVATED:
+              type: integer
+              minimum: 0
+            ACTIVE:
+              type: integer
+              minimum: 0
+            SUSPENDED:
+              type: integer
+              minimum: 0
+            RETIRED:
+              type: integer
+              minimum: 0
+          required:
+          - UNACTIVATED
+          - ACTIVE
+          - SUSPENDED
+          - RETIRED
+        stock_counts:
+          type: object
+          additionalProperties: false
+          properties:
+            GENERATED:
+              type: integer
+              minimum: 0
+            AVAILABLE:
+              type: integer
+              minimum: 0
+            SOLD:
+              type: integer
+              minimum: 0
+            DAMAGED:
+              type: integer
+              minimum: 0
+          required:
+          - GENERATED
+          - AVAILABLE
+          - SOLD
+          - DAMAGED
+        as_of:
+          type: string
+          format: date-time
+      required:
+      - total_units
+      - qr_counts
+      - stock_counts
+      - as_of
+    BatchResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Batch'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    ExportJobResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ExportJob'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    QrAdminResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/QrAdmin'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    PublicQrResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/PublicQr'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    ActivationResultResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ActivationResult'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    OwnerSessionResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/OwnerSession'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    OwnerQrResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/OwnerQr'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    StatsResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Stats'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    SaleResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Sale'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    SupportGrantResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/SupportGrant'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    ClaimResultResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/ClaimResult'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    RotatedCodeResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/RotatedCode'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    AdminMeResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/AdminMe'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    DashboardResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Dashboard'
+        request_id:
+          type: string
+      required:
+      - data
+      - request_id
+    BatchListResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Batch'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        request_id:
+          type: string
+      required:
+      - data
+      - pagination
+      - request_id
+    QrAdminListResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/QrAdmin'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        request_id:
+          type: string
+      required:
+      - data
+      - pagination
+      - request_id
+    AuditEventListResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        request_id:
+          type: string
+      required:
+      - data
+      - pagination
+      - request_id
+  responses:
+    Error400:
+      description: Request JSON atau parameter salah.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: MALFORMED_JSON
+              message: Request JSON atau parameter salah.
+            request_id: req_example
+    Error401:
+      description: Kredensial hilang, salah, kedaluwarsa atau dicabut.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNAUTHENTICATED
+              message: Kredensial hilang, salah, kedaluwarsa atau dicabut.
+            request_id: req_example
+    Error403:
+      description: Akses atau origin ditolak.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Akses atau origin ditolak.
+            request_id: req_example
+    Error404:
+      description: Resource tidak ditemukan.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RESOURCE_NOT_FOUND
+              message: Resource tidak ditemukan.
+            request_id: req_example
+    Error409:
+      description: Konflik status atau idempotency.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+        Retry-After:
+          description: 'Hanya REQUEST_IN_PROGRESS: 2 detik; tidak hadir untuk konflik permanen.'
+          schema:
+            type: integer
+            minimum: 1
+            example: 2
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: STATE_CONFLICT
+              message: Konflik status atau idempotency.
+            request_id: req_example
+    Error410:
+      description: Resource atau kemampuan sekali pakai tidak lagi berlaku.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: QR_RETIRED
+              message: Resource atau kemampuan sekali pakai tidak lagi berlaku.
+            request_id: req_example
+    Error412:
+      description: Versi QR sudah berubah; fetch ulang sebelum mencoba.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: VERSION_MISMATCH
+              message: Versi QR sudah berubah; fetch ulang sebelum mencoba.
+            request_id: req_example
+    Error415:
+      description: Body harus Content-Type application/json.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: UNSUPPORTED_MEDIA_TYPE
+              message: Body harus Content-Type application/json.
+            request_id: req_example
+    Error422:
+      description: Validasi input gagal.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Validasi input gagal.
+            request_id: req_example
+    Error423:
+      description: QR ditangguhkan; perubahan owner ditolak.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: QR_SUSPENDED
+              message: QR ditangguhkan; perubahan owner ditolak.
+            request_id: req_example
+    Error428:
+      description: If-Match wajib.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: PRECONDITION_REQUIRED
+              message: If-Match wajib.
+            request_id: req_example
+    Error429:
+      description: Rate limit terlampaui.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+        Retry-After:
+          description: Jumlah detik sebelum retry.
+          schema:
+            type: integer
+            minimum: 1
+            example: 900
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RATE_LIMITED
+              message: Rate limit terlampaui.
+            request_id: req_example
+    Error503:
+      description: Layanan sementara tidak tersedia; jangan mengubah state.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+        Retry-After:
+          description: Jumlah detik sebelum retry.
+          schema:
+            type: integer
+            minimum: 1
+            example: 5
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: Layanan sementara tidak tersedia; jangan mengubah state.
+            request_id: req_example
+    Error500:
+      description: Kesalahan server.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: Kesalahan server.
+            request_id: req_example
+    Error413:
+      description: Request body melebihi 16 KiB.
+      headers:
+        Cache-Control:
+          description: 'Semua JSON, HTML dan unduhan: no-store. Semua resolver responses: no-store, max-age=0. CDN
+            harus bypass cache.'
+          schema:
+            type: string
+            example: no-store
+        X-Request-Id:
+          description: ID tracing nonrahasia; sama dengan request_id JSON.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: PAYLOAD_TOO_LARGE
+              message: Body terlalu besar.
+            request_id: req_example
