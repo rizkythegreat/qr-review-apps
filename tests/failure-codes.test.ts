@@ -1,12 +1,49 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Pool } from 'pg';
-import { failureCode, logFailure } from '../src/server/errors';
+import { rootCertificates } from 'node:tls';
+import { X509Certificate } from 'node:crypto';
+import { databaseTlsDiagnostics, failureCode, logFailure } from '../src/server/errors';
 import { Application } from '../src/server/application';
 import { readConfig } from '../src/server/config';
 
 afterEach(() => vi.restoreAllMocks());
 
 describe('private failure diagnostics', () => {
+  it('distinguishes absent, malformed, escaped and multiline CA without logging its contents', () => {
+    const config = readConfig({
+      PUBLIC_ORIGIN: 'https://qr.test',
+      DATABASE_URL: 'postgresql://admin:private-password@private-host/db',
+      PIN_PEPPER: Buffer.alloc(32, 1).toString('base64'),
+      HMAC_KEY: Buffer.alloc(32, 2).toString('base64'),
+      ENCRYPTION_KEY: Buffer.alloc(32, 3).toString('base64'),
+    });
+    expect(databaseTlsDiagnostics(config)).toMatchObject({ ca_present: false, ca_valid: false });
+    expect(
+      databaseTlsDiagnostics({ ...config, DATABASE_SSL_CA: 'private-invalid-ca' }),
+    ).toMatchObject({
+      ca_present: true,
+      ca_valid: false,
+      ca_fingerprints_sha256: [],
+    });
+    const certificate = rootCertificates[0];
+    const expected = new X509Certificate(certificate).fingerprint256;
+    for (const ca of [certificate, certificate.replace(/\n/g, '\\n')]) {
+      const diagnostics = databaseTlsDiagnostics({ ...config, DATABASE_SSL_CA: ca });
+      expect(diagnostics).toMatchObject({
+        enabled: true,
+        ca_present: true,
+        ca_valid: true,
+        ca_fingerprints_sha256: [expected],
+        url_overrides_ssl: false,
+      });
+      expect(JSON.stringify(diagnostics)).not.toContain('private');
+      expect(JSON.stringify(diagnostics)).not.toContain('BEGIN CERTIFICATE');
+    }
+    expect(
+      databaseTlsDiagnostics({ ...config, DATABASE_URL: config.DATABASE_URL + '?sslmode=require' }),
+    ).toMatchObject({ url_overrides_ssl: true });
+  });
+
   it.each(['SELF_SIGNED_CERT_IN_CHAIN', '28P01', '42P01', '42501', 'ENETUNREACH', 'ENOTFOUND'])(
     'logs only the allowed error code %s',
     (code) => {

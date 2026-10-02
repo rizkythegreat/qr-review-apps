@@ -115,7 +115,7 @@ export class Application {
       return respond(result, requestId);
     } catch (error) {
       if (error instanceof ApiError) return errorResponse(error, requestId);
-      logFailure('api_failed', requestId, undefined, error);
+      logFailure('api_failed', requestId, undefined, error, this.config);
       return errorResponse(unavailable(), requestId);
     }
   }
@@ -471,7 +471,7 @@ export class Application {
         return fallback(404, 'QR tidak ditemukan.', requestId, head);
       if (error instanceof ApiError && error.status === 429)
         return fallback(429, error.message, requestId, head, error.retryAfter);
-      logFailure('resolver_failed', requestId, undefined, error);
+      logFailure('resolver_failed', requestId, undefined, error, this.config);
       return fallback(503, 'Layanan sementara tidak tersedia. Coba lagi.', requestId, head, 5);
     }
   }

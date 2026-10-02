@@ -1,4 +1,5 @@
 import type { Config } from './config';
+import { X509Certificate } from 'node:crypto';
 
 export class ApiError extends Error {
   preserveIdempotency = false;
@@ -84,6 +85,7 @@ export function logFailure(
   requestId?: string,
   invalidFields?: readonly (keyof Config)[],
   error?: unknown,
+  config?: Config,
 ) {
   // Never log request bodies, URLs with fragments, SQL parameters, cookies, or raw exception objects.
   console.error(
@@ -93,6 +95,39 @@ export function logFailure(
       time: new Date().toISOString(),
       ...(invalidFields ? { invalid_fields: invalidFields } : {}),
       ...(error === undefined ? {} : { error_code: failureCode(error) }),
+      ...(config && error !== undefined && failureCode(error) === 'SELF_SIGNED_CERT_IN_CHAIN'
+        ? { database_tls: databaseTlsDiagnostics(config) }
+        : {}),
     }),
   );
+}
+
+export function databaseTlsDiagnostics(config: Config) {
+  const ca = config.DATABASE_SSL_CA?.replace(/\\n/g, '\n').trim();
+  const blocks = ca?.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g) || [];
+  const fingerprints: string[] = [];
+  let valid = blocks.length > 0;
+  for (const block of blocks) {
+    try {
+      fingerprints.push(new X509Certificate(block).fingerprint256);
+    } catch {
+      valid = false;
+    }
+  }
+  let urlOverridesSsl = false;
+  try {
+    const url = new URL(config.DATABASE_URL);
+    urlOverridesSsl = ['sslmode', 'sslcert', 'sslkey', 'sslrootcert'].some((key) =>
+      url.searchParams.has(key),
+    );
+  } catch {
+    // Never print a malformed connection string.
+  }
+  return {
+    enabled: config.DATABASE_SSL === 'true',
+    ca_present: Boolean(ca),
+    ca_valid: valid,
+    ca_fingerprints_sha256: fingerprints,
+    url_overrides_ssl: urlOverridesSsl,
+  };
 }
