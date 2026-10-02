@@ -69,7 +69,12 @@ export async function apiRequest<T>(
   if (response.status === 204)
     return { data: null as T, request_id: response.headers.get('X-Request-Id') || '', etag: null };
   const result = await response.json();
-  return { ...result, etag: response.headers.get('ETag') };
+  // QR versions are concurrency tokens. A proxy can change the representation ETag,
+  // so use the version returned in the same payload for subsequent If-Match requests.
+  const version = result.data?.version ?? result.data?.qr?.version;
+  const etag =
+    Number.isSafeInteger(version) && version > 0 ? `"v${version}"` : response.headers.get('ETag');
+  return { ...result, etag };
 }
 export async function apiBlob(path: string, options: ApiOptions = {}) {
   return (await apiFetch(path, options)).blob();
