@@ -4,6 +4,14 @@ import { ApiError } from './errors';
 import { hmac } from './crypto';
 import type { Result } from './idempotency';
 
+export function qrVersionPrecondition(request: Request): string | null {
+  const qrMatch = request.headers.get('x-qr-if-match');
+  const httpMatch = request.headers.get('if-match');
+  if (qrMatch !== null && httpMatch !== null && qrMatch !== httpMatch)
+    throw new ApiError(400, 'INVALID_PARAMETER', 'Header versi QR bertentangan.');
+  return qrMatch ?? httpMatch;
+}
+
 export async function readJson(request: Request) {
   const length = request.headers.get('content-length');
   if (length && /^\d+$/.test(length) && Number(length) > 16384)

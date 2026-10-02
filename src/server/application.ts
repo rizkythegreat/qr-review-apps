@@ -25,7 +25,15 @@ import {
   versionOperations,
   type Operation,
 } from './routes';
-import { errorResponse, fallback, headers, readJson, respond, source } from './http';
+import {
+  errorResponse,
+  fallback,
+  headers,
+  qrVersionPrecondition,
+  readJson,
+  respond,
+  source,
+} from './http';
 import { type Visit, recordVisit, shouldCount } from './statistics';
 
 const listSchema = z.strictObject({
@@ -92,7 +100,7 @@ export class Application {
       let raw: unknown;
       if (op in bodies) raw = await readJson(request);
       if (versionOperations.has(op)) {
-        const matchHeader = request.headers.get('if-match');
+        const matchHeader = qrVersionPrecondition(request);
         if (!matchHeader) throw new ApiError(428, 'PRECONDITION_REQUIRED', 'If-Match diperlukan.');
         if (!/^"v[1-9][0-9]*"$/.test(matchHeader))
           throw new ApiError(400, 'INVALID_PARAMETER', 'If-Match harus strong ETag QR.');
@@ -131,7 +139,7 @@ export class Application {
     key: string | null,
   ): Promise<Result> {
     const actor = { type: 'ADMIN' as const, id: admin || null };
-    const ifMatch = request.headers.get('if-match');
+    const ifMatch = qrVersionPrecondition(request);
     const idem = (
       principal = admin ? `admin:${admin}` : `token:${p.token}`,
     ): Idempotency | undefined =>

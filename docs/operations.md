@@ -4,6 +4,8 @@ Konfigurasikan koneksi PostgreSQL Supabase melalui environment server, lalu jala
 
 Domain `PUBLIC_ORIGIN` menjadi bagian URL yang dicetak. Tetapkan domain produksi sebelum ekspor untuk vendor. Jalankan Next.js di belakang ingress HTTPS yang mengganti forwarded protocol/source headers. Gunakan bypass cache untuk seluruh API dan resolver; perubahan URL berlaku pada GET berikutnya. Cookie pemilik harus tetap HttpOnly/Secure/SameSite=Strict tanpa Domain.
 
+UI mengirim versi QR melalui `X-QR-If-Match: "vN"`, berdasarkan `version` pada payload QR. Aplikasi memeriksa versi secara atomik bersama mutasi dan tetap menolak versi usang dengan `412 VERSION_MISMATCH`. Header standar `If-Match` tetap diterima untuk klien lama, tetapi proxy dapat mengevaluasinya dan mengganti respons sesudah mutasi tersimpan. Gunakan `X-QR-If-Match` di Vercel; jika kedua header dikirim, nilainya harus sama.
+
 Worker `npm run worker` harus hidup terpisah dari lifecycle request Next.js. Lebih dari satu worker dapat dijalankan karena claim job memakai row lock `SKIP LOCKED`. Lease job RUNNING dipulihkan setelah lima menit; finalisasi memeriksa lease agar worker lama tidak menimpa hasil worker pengganti. Job gagal ditandai FAILED dan batch tetap ada. Retry ekspor yang gagal memakai Idempotency-Key baru.
 
 Scheduler menjalankan `npm run maintenance` setiap menit. TTL diperiksa juga pada endpoint dan worker, sehingga response expired ditolak walau scheduler terlambat. Pencabutan/aktivasi/rotasi menghapus snapshot batch dan secret archive segera. Riwayat scan mentah disimpan 90 hari; statistik ownership tidak terhapus oleh cleanup. Audit dan sale tidak dihapus otomatis sambil menunggu keputusan retensi 12 bulan dari PRD.

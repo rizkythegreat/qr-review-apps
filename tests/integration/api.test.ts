@@ -279,6 +279,40 @@ describe('admin, production and inventory', () => {
       conn.release();
     }
   });
+  it('enforces the proxy-safe QR version header before updating stock', async () => {
+    const { qr } = await batch();
+    const path = `/api/v1/admin/qr-codes/${qr[0].id}/stock`;
+    const body = { stock_status: 'AVAILABLE', reason: 'Checked' };
+    const stale = await call('PATCH', path, body, { headers: { 'X-QR-If-Match': '"v99"' } });
+    expect(stale.status).toBe(412);
+    expect(stale.error.code).toBe('VERSION_MISMATCH');
+    const conflicting = await call('PATCH', path, body, {
+      version: 1,
+      headers: { 'X-QR-If-Match': '"v2"' },
+    });
+    expect(conflicting.status).toBe(400);
+    const saved = await call('PATCH', path, body, { headers: { 'X-QR-If-Match': '"v1"' } });
+    expect(saved.status).toBe(200);
+    expect(saved.data.stock_status).toBe('AVAILABLE');
+    expect(saved.data.version).toBe(2);
+    const outdated = await call(
+      'PATCH',
+      path,
+      { stock_status: 'DAMAGED', reason: 'Checked' },
+      {
+        headers: { 'X-QR-If-Match': '"v1"' },
+      },
+    );
+    expect(outdated.status).toBe(412);
+    expect(
+      (
+        await db.pool.query('select stock_status,version from qr_review.qr_codes where id=$1', [
+          qr[0].id,
+        ])
+      ).rows[0],
+    ).toMatchObject({ stock_status: 'AVAILABLE', version: 2 });
+  });
+
   it('enforces If-Match, QC transitions and one durable sale per unit', async () => {
     const { qr } = await batch();
     const q = qr[0],

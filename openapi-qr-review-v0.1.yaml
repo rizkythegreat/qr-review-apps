@@ -660,6 +660,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/QrId'
       - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/QrIfMatch'
       responses:
         '200':
           description: Berhasil.
@@ -729,6 +730,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/QrId'
       - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/QrIfMatch'
       - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '201':
@@ -840,6 +842,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/QrId'
       - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/QrIfMatch'
       - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
@@ -910,6 +913,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/QrId'
       - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/QrIfMatch'
       - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
@@ -981,6 +985,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/QrId'
       - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/QrIfMatch'
       - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
@@ -1052,6 +1057,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/QrId'
       - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/QrIfMatch'
       - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
@@ -1126,6 +1132,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/QrId'
       - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/QrIfMatch'
       - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '201':
@@ -1201,6 +1208,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/QrId'
       - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/QrIfMatch'
       - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '201':
@@ -1532,6 +1540,7 @@ paths:
       - OwnerCookie: []
       parameters:
       - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/QrIfMatch'
       - $ref: '#/components/parameters/Origin'
       - $ref: '#/components/parameters/Csrf'
       responses:
@@ -1643,6 +1652,7 @@ paths:
       - OwnerCookie: []
       parameters:
       - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/QrIfMatch'
       - $ref: '#/components/parameters/Origin'
       - $ref: '#/components/parameters/Csrf'
       responses:
@@ -2173,11 +2183,19 @@ components:
     IfMatch:
       name: If-Match
       in: header
-      required: true
+      required: false
       schema:
         type: string
         pattern: ^"v[1-9][0-9]*"$
-      description: Strong ETag resource dari GET. Hilang 428; versi usang 412. Evaluasi atomik bersama mutasi.
+      description: Strong ETag resource dari GET. Wajib salah satu dari If-Match atau X-QR-If-Match. Hilang 428; versi usang 412. Evaluasi atomik bersama mutasi. Untuk deployment di balik proxy, gunakan X-QR-If-Match.
+    QrIfMatch:
+      name: X-QR-If-Match
+      in: header
+      required: false
+      schema:
+        type: string
+        pattern: ^"v[1-9][0-9]*"$
+      description: Alias If-Match untuk versi QR, diperiksa atomik oleh aplikasi tanpa evaluasi kondisi HTTP oleh proxy. Wajib salah satu header versi; jika keduanya dikirim nilainya harus sama.
     Csrf:
       name: X-CSRF-Token
       in: header

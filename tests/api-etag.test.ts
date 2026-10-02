@@ -25,7 +25,9 @@ describe('QR concurrency tokens through hosting proxies', () => {
         etag: qr.etag,
         body: { stock_status: 'AVAILABLE', reason: 'Checked' },
       });
-      expect(new Headers(fetch.mock.calls[1][1].headers).get('If-Match')).toBe('"v7"');
+      const sentHeaders = new Headers(fetch.mock.calls[1][1].headers);
+      expect(sentHeaders.get('X-QR-If-Match')).toBe('"v7"');
+      expect(sentHeaders.has('If-Match')).toBe(false);
       expect(changed.etag).toBe('"v8"');
     },
   );

@@ -26,7 +26,7 @@ async function apiFetch(path: string, options: ApiOptions) {
   const headers = new Headers({ Accept: 'application/json' });
   if (options.body !== undefined) headers.set('Content-Type', 'application/json');
   if (options.bearer) headers.set('Authorization', `Bearer ${options.bearer}`);
-  if (options.etag) headers.set('If-Match', options.etag);
+  if (options.etag) headers.set('X-QR-If-Match', options.etag);
   if (options.csrf) headers.set('X-CSRF-Token', options.csrf);
   if (options.key) headers.set('Idempotency-Key', options.key);
   let response: Response;
