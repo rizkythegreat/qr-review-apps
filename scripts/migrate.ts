@@ -2,6 +2,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { Pool } from 'pg';
+import { databaseCa } from '../src/server/database-tls';
 
 export async function migrate(pool: Pool) {
   const db = await pool.connect();
@@ -49,7 +50,7 @@ export function migrationPool() {
         ? false
         : {
             rejectUnauthorized: true,
-            ca: process.env.DATABASE_SSL_CA?.replace(/\\n/g, '\n') || undefined,
+            ca: databaseCa(process.env.DATABASE_SSL_CA),
           },
   });
 }

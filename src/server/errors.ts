@@ -117,8 +117,8 @@ export function databaseTlsDiagnostics(config: Config) {
   let urlOverridesSsl = false;
   try {
     const url = new URL(config.DATABASE_URL);
-    urlOverridesSsl = ['sslmode', 'sslcert', 'sslkey', 'sslrootcert'].some((key) =>
-      url.searchParams.has(key),
+    urlOverridesSsl = ['ssl', 'sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'sslnegotiation'].some(
+      (key) => url.searchParams.has(key),
     );
   } catch {
     // Never print a malformed connection string.

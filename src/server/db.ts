@@ -1,5 +1,6 @@
 import { Pool, type PoolClient, type PoolConfig } from 'pg';
 import type { Config } from './config';
+import { databaseCa } from './database-tls';
 
 export type Db = Pool | PoolClient;
 export function createPool(config: Config, overrides: PoolConfig = {}) {
@@ -10,7 +11,7 @@ export function createPool(config: Config, overrides: PoolConfig = {}) {
       config.DATABASE_SSL === 'true'
         ? {
             rejectUnauthorized: true,
-            ca: config.DATABASE_SSL_CA?.replace(/\\n/g, '\n') || undefined,
+            ca: databaseCa(config.DATABASE_SSL_CA),
           }
         : false,
     connectionTimeoutMillis: 3000,
