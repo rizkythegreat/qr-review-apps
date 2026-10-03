@@ -6,6 +6,7 @@ import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { InstallApp } from '@/components/install-app';
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -24,12 +25,15 @@ export function SiteHeader() {
         <SidebarTrigger className="-ml-1" aria-label="Buka navigasi" />
         <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
         <span className="text-sm font-medium">{title}</span>
-        <Button asChild variant="ghost" size="sm" className="ml-auto">
-          <Link href="/manage" aria-label="Halaman pemilik">
-            <ExternalLink />
-            <span className="hidden sm:inline">Halaman pemilik</span>
-          </Link>
-        </Button>
+        <div className="ml-auto flex items-center gap-1">
+          <InstallApp />
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/manage" aria-label="Halaman pemilik">
+              <ExternalLink />
+              <span className="hidden sm:inline">Halaman pemilik</span>
+            </Link>
+          </Button>
+        </div>
       </div>
     </header>
   );

@@ -109,3 +109,9 @@ Jalankan `npm run db:migrate` sebelum deploy pembaruan ini untuk menambahkan ind
 Untuk mengosongkan seluruh data operasional, jalankan isi [reset-app-data.sql](scripts/sql/reset-app-data.sql) secara manual di Supabase SQL Editor sebagai pemilik schema, saat aplikasi dan worker tidak sedang digunakan. SQL menghapus seluruh batch, QR, penjualan, kepemilikan, kunjungan, log aktivitas, sesi pemilik, grant dukungan, ekspor, idempotency, dan rate limit. Setelah commit, QR dan link lama tidak berlaku lagi; simpan backup bila data masih diperlukan.
 
 Akun Supabase Auth, allowlist admin, ledger migrasi, struktur tabel, indeks, RLS, constraint, dan trigger dipertahankan. Setelah reset, admin tetap dapat login dan membuat batch baru. File reset berada di luar direktori migrasi dan tidak dijalankan saat deploy.
+
+### Install ke home screen
+
+Aplikasi menyediakan `/manifest.webmanifest`, ikon PNG 192/512 px, ikon maskable, dan metadata Apple. Aplikasi yang diinstal terbuka dalam mode standalone dengan nama **QR Review**, mulai dari beranda. Gunakan URL HTTPS production untuk instalasi; data tetap memerlukan koneksi internet.
+
+Tombol **Install** tersedia di header halaman publik dan admin. Chrome/Edge membuka prompt instalasi ketika browser menyediakannya; jika belum tersedia, tombol menampilkan petunjuk melalui menu browser. Di iPhone/iPad, buka di Safari, pilih **Bagikan → Tambahkan ke Layar Utama**, aktifkan **Buka sebagai App** jika tersedia, lalu **Tambah**. Tombol disembunyikan saat aplikasi dibuka dalam mode standalone.

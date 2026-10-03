@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import './globals.css';
 import { Geist } from 'next/font/google';
 import { cn } from '@/lib/utils';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { Providers } from '@/components/providers';
 import { Toaster } from '@/components/ui/sonner';
@@ -16,7 +16,11 @@ export const metadata: Metadata = {
   title: { default: 'QR Review — Kelola QR toko', template: '%s · QR Review' },
   description: 'Produksi, aktivasi, dan kelola QR untuk akses ulasan toko.',
   robots: { index: false, follow: false },
+  applicationName: 'QR Review',
+  appleWebApp: { capable: true, title: 'QR Review', statusBarStyle: 'default' },
 };
+
+export const viewport: Viewport = { themeColor: '#171717' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
