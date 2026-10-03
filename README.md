@@ -1,122 +1,289 @@
-# QR Review — MVP
+# QR Review
 
-Implementasi Next.js berdasarkan [PRD](PRD_Akrilik_QR_Review_MVP.md) dan [OpenAPI v0.1](openapi-qr-review-v0.1.yaml). Semua 32 operasi API aplikasi serta GET/HEAD resolver tersedia. UI menggunakan Tailwind CSS v4 dan komponen shadcn/ui, dengan adaptasi blocks resmi `login-04` dan `dashboard-01`. Halaman admin, aktivasi, kelola pemilik, dan dukungan terhubung ke API aplikasi.
+**Produksi QR, aktivasi toko, dan pengelolaan akses Google Review dalam satu aplikasi.**
 
-Next.js menjalankan API di Node.js. Database adalah PostgreSQL Supabase melalui koneksi server `pg`, sehingga perubahan stok, aktivasi, audit, sesi, dan grant dapat memakai satu transaksi. Supabase Auth memverifikasi bearer admin; allowlist admin tersimpan di database. Pemilik memakai PIN dan sesi opaque tanpa akun Supabase. Aplikasi tidak memerlukan service-role key di browser maupun untuk akses PostgreSQL.
+QR Review membantu mengelola unit QR untuk toko dan kafe, mulai dari pembuatan batch hingga penggunaan oleh pemilik. Admin menyiapkan QR dan kode aktivasi; pemilik mengatur nama toko, tujuan ulasan, dan PIN. Link Google Review dapat diperbarui tanpa mencetak ulang QR.
 
-## Menjalankan aplikasi
+[Preview](#preview) · [Fitur](#fitur-utama) · [Instalasi](#instalasi-lokal) · [Deployment](#deployment-ke-vercel) · [Dokumentasi](#dokumentasi)
 
-Gunakan Node.js 20.19+ dan PostgreSQL 15+ atau database Supabase.
+## Preview
 
-```sh
+### Dashboard admin
+
+Pantau produksi, stok, penjualan, dan status seluruh unit QR.
+
+[![Dashboard admin QR Review dalam mode gelap](artifacts/ui/dashboard-dark-desktop.png)](artifacts/ui/dashboard-dark-desktop.png)
+
+<details>
+<summary>Lihat dashboard dalam mode terang</summary>
+
+![Dashboard admin QR Review dalam mode terang](artifacts/ui/dashboard-desktop.png)
+
+</details>
+
+### Informasi unit dan log aktivitas
+
+| Informasi unit                                                                                                            | Log aktivitas                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| [![Informasi unit QR dengan kode aktivasi tersensor](artifacts/ui/qr-unit-desktop.png)](artifacts/ui/qr-unit-desktop.png) | [![Log aktivitas dengan filter dan detail perubahan](artifacts/ui/activity-desktop.png)](artifacts/ui/activity-desktop.png) |
+| QR publik, unduhan, status, dan kode aktivasi dengan tombol tampil/sembunyikan.                                           | Riwayat perubahan dengan filter unit, toko, tindakan, dan tanggal.                                                          |
+
+### Tampilan mobile
+
+|                                                          Dashboard                                                          |                                                     Login admin                                                     |                                                          Halaman pemilik                                                           |
+| :-------------------------------------------------------------------------------------------------------------------------: | :-----------------------------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------------: |
+| <img src="artifacts/ui/dashboard-dark-mobile.png" alt="Dashboard admin pada perangkat mobile dalam mode gelap" width="250"> | <img src="artifacts/ui/login-dark-mobile.png" alt="Login admin pada perangkat mobile dalam mode gelap" width="250"> | <img src="artifacts/ui/owner-login-dark-mobile.png" alt="Halaman pemilik dengan login token dan PIN dalam mode gelap" width="250"> |
+
+> Screenshot diambil dari aplikasi dalam lingkungan pengujian dengan data contoh. Klik gambar desktop untuk melihat ukuran penuh. Seluruh tangkapan tersedia di [`artifacts/ui`](artifacts/ui).
+
+## Fitur utama
+
+### Untuk admin
+
+- **Produksi batch:** membuat 1–500 unit dengan token QR unik.
+- **Ekspor untuk pencetakan:** PNG/SVG dan manifest dalam ZIP, dengan paket kode aktivasi yang terpisah.
+- **Penjualan otomatis:** aktivasi pemilik langsung mencatat penjualan, waktu aktivasi, dan nama toko pembeli.
+- **Pengelolaan unit:** informasi QR, unduhan, stok rusak, status layanan, dan riwayat tindakan.
+- **Kode aktivasi tersensor:** salinan yang masih tersedia dapat dilihat atau disembunyikan melalui tombol mata.
+- **Log aktivitas:** pencarian berdasarkan token/ID atau nama toko, filter tindakan, dan rentang tanggal WIB.
+- **Dukungan pemilik:** reset PIN, transfer kepemilikan, rotasi kode, suspend/resume, dan penonaktifan permanen.
+
+### Untuk pemilik dan pengunjung
+
+- **Aktivasi mandiri:** menggunakan kode aktivasi, nama toko, link Google Review, dan PIN empat digit.
+- **Akses tanpa membuat akun:** masuk ke halaman kelola menggunakan token dan PIN.
+- **Tujuan ulasan yang dapat diperbarui:** perubahan link berlaku tanpa mengganti QR yang sudah dicetak.
+- **Statistik kunjungan:** total kunjungan dan waktu akses terakhir untuk periode kepemilikan toko.
+- **Tampilan responsif:** mendukung desktop, tablet, dan mobile dengan tema terang, gelap, atau mengikuti sistem.
+- **Instalasi ke home screen:** membuka aplikasi dalam mode standalone, langsung ke halaman admin.
+
+## Alur penggunaan
+
+1. **Buat batch.** Admin menyiapkan unit dan mengunduh paket QR publik serta kode aktivasi.
+2. **Serahkan ke toko.** Berikan QR dan kode aktivasi yang sesuai kepada pemilik.
+3. **Aktifkan.** Pemilik mengisi data toko, link ulasan, dan PIN. Aktivasi serta pencatatan penjualan dilakukan dalam satu transaksi.
+4. **Gunakan.** Pengunjung memindai QR dan diarahkan ke halaman Google Review toko.
+5. **Kelola.** Pemilik memperbarui data dan melihat kunjungan; admin memantau stok, penjualan, dan dukungan.
+
+Nama toko saat aktivasi tersimpan sebagai **Toko pembeli** pada penjualan otomatis. Perubahan nama toko atau kepemilikan berikutnya tidak mengubah catatan tersebut. Penjualan lama tetap menggunakan data yang sudah tercatat.
+
+Salinan kode asli mengikuti masa berlaku snapshot batch: maksimal 24 jam setelah pembuatan, sebelum aktivasi atau rotasi kode unit mana pun dalam batch. Setelah salinan dihapus, gunakan paket yang telah diunduh atau rotasi kode untuk unit yang belum aktif.
+
+## Teknologi
+
+| Bagian              | Teknologi                                                 |
+| ------------------- | --------------------------------------------------------- |
+| Aplikasi dan API    | Next.js 16, React 19, TypeScript                          |
+| Antarmuka           | Tailwind CSS 4, shadcn/ui, Lucide                         |
+| Pengelolaan data UI | TanStack Query                                            |
+| Database            | PostgreSQL melalui `pg`, dengan schema privat `qr_review` |
+| Autentikasi admin   | Supabase Auth dan allowlist database                      |
+| Autentikasi pemilik | PIN, sesi opaque, dan cookie aman                         |
+| Ekspor              | QRCode, JSZip, dan job PostgreSQL                         |
+| Tema                | next-themes                                               |
+| Pengujian           | Vitest, PostgreSQL, Playwright/Chromium                   |
+
+API berjalan pada runtime Node.js. Aktivasi, penjualan, audit, dan kepemilikan menggunakan transaksi PostgreSQL. Browser tidak mengakses tabel privat secara langsung; akses administratif diverifikasi melalui Supabase Auth dan allowlist di server.
+
+## Instalasi lokal
+
+### Prasyarat
+
+- Node.js **20.19 atau lebih baru** dan npm.
+- PostgreSQL **15 atau lebih baru**, lokal atau melalui Supabase.
+- Project Supabase dengan Auth email/password untuk akun admin.
+
+### 1. Siapkan repository
+
+```bash
+git clone https://github.com/rizkythegreat/qr-review-apps.git
+cd qr-review-apps
 npm ci
 cp .env.example .env.local
 ```
 
-Isi `.env.local`:
+### 2. Konfigurasi environment
 
-- `PUBLIC_ORIGIN`: origin HTTPS yang akan dicetak ke QR, misalnya `https://qr.domain-anda.id`.
-- `DATABASE_URL`: koneksi PostgreSQL dari dashboard Supabase. Koneksi direct, session pooler, atau transaction pooler didukung; query runtime tidak memakai named prepared statements.
-- `MIGRATION_DATABASE_URL`: opsional, akun pemilik schema untuk migrasi dan provisioning admin.
-- `DATABASE_SSL=true` untuk Supabase. Sertifikat diverifikasi; isi `DATABASE_SSL_CA` bila CA project dibutuhkan. PostgreSQL lokal dapat memakai `false`.
-- `SUPABASE_URL` dan `SUPABASE_PUBLISHABLE_KEY`: project URL dan publishable/legacy anon key untuk verifikasi Auth.
-- `PIN_PEPPER`, `HMAC_KEY`, `ENCRYPTION_KEY`: tiga nilai berbeda, masing-masing 32 byte acak dalam base64. Jalankan `openssl rand -base64 32` untuk setiap nilai. Gunakan nilai yang sama pada server dan worker.
-- `TRUSTED_IP_HEADER`: header IP tunggal yang diganti oleh reverse proxy tepercaya. Misalnya `x-vercel-forwarded-for` di deployment Vercel. Jika kosong/invalid, limiter memakai bucket sumber bersama. Header proxy yang dipilih harus disanitasi di ingress.
+Isi `.env.local` berdasarkan [`.env.example`](.env.example).
 
-Jika migrasi melaporkan sertifikat SSL tidak dipercaya, unduh CA melalui **Database settings → SSL Configuration → Download certificate** di Supabase, lalu isi `DATABASE_SSL_CA` dengan isi sertifikat PEM. Newline dapat ditulis sebagai `\n` di dalam nilai yang dibungkus tanda petik ganda. Pertahankan `DATABASE_SSL=true` agar sertifikat dan hostname database tetap diverifikasi. Hindari parameter `sslmode`, `sslrootcert`, `sslcert`, atau `sslkey` pada connection string ketika memakai konfigurasi SSL aplikasi; node-postgres mengganti objek SSL jika parameter tersebut ada.
+| Variabel                   | Fungsi                                                                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `PUBLIC_ORIGIN`            | Origin HTTPS untuk link aplikasi dan QR yang dicetak. Tanpa path atau trailing slash; contoh lokal: `https://localhost:3000`. |
+| `DATABASE_URL`             | Connection string PostgreSQL untuk runtime aplikasi. Mendukung koneksi direct dan pooler tanpa named prepared statements.     |
+| `MIGRATION_DATABASE_URL`   | Opsional: koneksi dengan hak pemilik schema untuk migrasi dan provisioning admin.                                             |
+| `DATABASE_SSL`             | `true` untuk koneksi Supabase dengan TLS; `false` untuk PostgreSQL lokal tanpa TLS.                                           |
+| `DATABASE_SSL_CA`          | Isi sertifikat CA dalam format PEM bila diperlukan untuk validasi TLS database.                                               |
+| `SUPABASE_URL`             | URL project Supabase untuk autentikasi.                                                                                       |
+| `SUPABASE_PUBLISHABLE_KEY` | Publishable key atau legacy anon key dari project yang sama.                                                                  |
+| `PIN_PEPPER`               | Kunci untuk melindungi hash PIN.                                                                                              |
+| `HMAC_KEY`                 | Kunci untuk hash dan verifikasi internal.                                                                                     |
+| `ENCRYPTION_KEY`           | Kunci enkripsi snapshot, arsip, dan respons rahasia.                                                                          |
+| `TRUSTED_IP_HEADER`        | Opsional: header IP yang ditimpa proxy tepercaya; contoh Vercel: `x-vercel-forwarded-for`.                                    |
+| `DATABASE_POOL_SIZE`       | Opsional: batas koneksi per pool; default `5`.                                                                                |
+| `STATISTICS_TIMEOUT_MS`    | Opsional: batas eksekusi SQL statistik; default `150` ms.                                                                     |
+| `TEST_TRAFFIC_SECRET`      | Opsional: penanda trafik pengujian untuk pengecualian statistik.                                                              |
 
-Migrasi dikelola oleh script aplikasi dengan ledger `qr_review.schema_migrations`; SQL disimpan di `supabase/migrations`.
+Buat **tiga kunci berbeda**, masing-masing 32 byte acak dalam base64. Jalankan perintah berikut sekali untuk setiap kunci:
 
-```sh
+```bash
+openssl rand -base64 32
+```
+
+Gunakan nilai kunci yang sama pada seluruh instance aplikasi dan worker. `.env.local` tidak boleh masuk ke Git.
+
+Jika koneksi database memerlukan CA, gunakan sertifikat project Supabase dan pertahankan validasi TLS. Dalam `.env.local`, PEM dapat ditulis dengan `\n` di dalam nilai berpetik. Pada pengaturan environment hosting, masukkan nilai tanpa tanda petik luar. Hindari parameter SSL pada connection string yang mengganti konfigurasi CA aplikasi. Rincian tersedia di [panduan operasional](docs/operations.md).
+
+### 3. Migrasi database dan daftarkan admin
+
+Buat user email/password terlebih dahulu di Supabase Auth, lalu tambahkan UUID user tersebut ke allowlist:
+
+```bash
 npm run db:migrate
 npm run admin:add -- UUID_USER_SUPABASE_AUTH
+```
+
+Migrasi berada di [`supabase/migrations`](supabase/migrations) dan dicatat dalam `qr_review.schema_migrations`. Tabel aplikasi berada di schema **`qr_review`**, bukan `public`.
+
+### 4. Jalankan aplikasi
+
+```bash
 npm run dev
 ```
 
-Daftarkan user email/password admin di Supabase Auth terlebih dahulu dan tambahkan UUID-nya dengan `admin:add`. Buka `/admin/login` untuk masuk. Login/refresh/logout admin memakai SDK Supabase Auth; token sesi disimpan SDK di browser dan API tetap memeriksa allowlist database. Role `user_metadata` tidak digunakan.
+Buka `https://localhost:3000/admin/login`. Development menggunakan HTTPS agar cookie sesi pemilik yang bersifat Secure dapat bekerja. Sesuaikan `PUBLIC_ORIGIN` jika host atau port berubah.
 
-Setelah server dan worker berjalan, gunakan urutan berikut:
+Untuk memakai sertifikat development sendiri:
 
-1. Buka `/admin`, buat batch, lalu siapkan dan unduh ZIP QR publik serta ZIP kode aktivasi secara terpisah.
-2. Berikan QR dan kode aktivasi kepada pemilik toko; tidak perlu mencatat penjualan atau meloloskan QC secara manual.
-3. Pindai QR atau buka `/r/TOKEN`. Pemilik mengisi kode aktivasi, nama toko, link review Google dan PIN empat digit. Aktivasi berhasil otomatis mencatat penjualan dan mengubah stok menjadi `SOLD`.
-   Di informasi unit admin, kode tersensor secara bawaan dan tombol mata mengambil salinan saat diminta. Salinan mengikuti masa berlaku snapshot batch (24 jam, sebelum aktivasi/rotasi unit mana pun). Kode yang telah digunakan atau salinan yang dihapus tidak dapat dilihat ulang; gunakan unduhan sebelumnya atau rotasi melalui tab Dukungan.
-4. Pemilik membuka `/manage` menggunakan token dan PIN untuk memperbarui link, melihat kunjungan atau mengganti PIN.
-5. Admin menggunakan tab Dukungan di detail QR untuk reset PIN, transfer, rotasi kode, suspend/resume atau penonaktifan permanen. Bantuan penggunaan tersedia di `/help`.
-
-Tema tampilan dapat dipilih melalui tombol matahari/bulan di header atau halaman login: Terang, Gelap, atau Ikuti sistem. Preferensi tersimpan di browser dan berlaku untuk halaman admin serta publik/pemilik.
-
-Development memakai HTTPS agar cookie `__Host-owner_session` berfungsi. Next.js dapat membuat sertifikat development. Jika ingin memakai sertifikat lokal sendiri:
-
-```sh
-mkdir -p certificates
-openssl req -x509 -newkey rsa:2048 -nodes -keyout certificates/key.pem -out certificates/cert.pem -days 30 -subj '/CN=localhost'
+```bash
 npm run dev -- --experimental-https-key=certificates/key.pem --experimental-https-cert=certificates/cert.pem
 ```
 
-`npm run build` dan `npm start` menjalankan build produksi. Gunakan ingress HTTPS yang mengganti forwarded headers dan menonaktifkan cache untuk `/api/v1/*` dan `/r/*`. API memeriksa HTTPS dan mengirim `Cache-Control: no-store`; resolver juga memakai `max-age=0`.
+## Deployment ke Vercel
 
-## Ekspor dan maintenance
+1. Jalankan migrasi pada database produksi dan daftarkan akun admin untuk environment tersebut.
+2. Import repository GitHub ke Vercel dengan framework **Next.js**.
+3. Tambahkan environment dari `.env.example` untuk environment tujuan. Gunakan origin HTTPS produksi sebagai `PUBLIC_ORIGIN`, serta database dan Auth Supabase yang sesuai.
+4. Gunakan build command `npm run build`, lakukan deploy, lalu periksa login admin, aktivasi, dan ekspor.
+5. Setelah mengubah environment variable, lakukan redeploy agar nilai baru digunakan aplikasi.
 
-Jalankan worker sebagai proses Node.js terpisah dengan environment database/origin/kunci yang sama:
+Tetapkan domain permanen `PUBLIC_ORIGIN` sebelum menghasilkan QR untuk pencetakan.
 
-```sh
+Konfigurasi repository mengaktifkan **Fluid Compute**. Ekspor diproses setelah respons API melalui `after()`, dan polling status dapat melanjutkan job tertunda. **Worker CLI terpisah tidak diperlukan untuk alur ekspor Vercel ini.** Pemrosesan tetap mengikuti batas waktu dan ukuran file yang dikonfigurasi; lihat [panduan deployment dan pemulihan job](docs/operations.md#pilihan-deployment).
+
+Maintenance memerlukan scheduler terpisah; repository ini belum mengatur jadwal tersebut secara otomatis. Deployment ke Cloudflare Workers memerlukan adaptasi runtime dan pengujian tambahan. Static export tidak mencakup API dan sesi aplikasi.
+
+## Job dan maintenance
+
+### Worker untuk hosting Node.js persisten
+
+Sebagai alternatif alur Vercel, jalankan worker dengan database, origin, dan kunci yang sama:
+
+```bash
 npm run worker
 ```
 
-`npm run worker -- --once` memproses satu job. Job tersimpan di PostgreSQL, memakai lease dan `SKIP LOCKED`, dan dapat dilanjutkan setelah worker terhenti. Ekspor publik berisi manifest dan PNG/SVG; ekspor kode aktivasi menggunakan ZIP terpisah. Snapshot dan ZIP rahasia terenkripsi AES-256-GCM di database. Worker serta endpoint status/download memeriksa ulang TTL dan validitas snapshot.
+Untuk memproses satu job:
 
-Jadwalkan `npm run maintenance` **setiap menit** melalui scheduler hosting. Script menghapus ciphertext yang kedaluwarsa, sesi lama, grant lama, bucket rate limit, dan raw scan events lebih dari 90 hari. Agregat kunjungan per kepemilikan dipertahankan. Akses secret tetap ditolak tepat setelah TTL walau job cleanup terlambat. Retensi audit/penjualan 12 bulan masih keputusan draft PRD dan tidak dihapus otomatis.
-
-## Memakai API
-
-Body JSON maksimal 16 KiB; field tambahan dan `null` yang tidak diizinkan ditolak. PIN berupa string empat digit, termasuk nol awal. URL review hanya menerima policy `GOOGLE_REVIEW_V1`: `https://g.page/r/{code}/review` atau `https://search.google.com/local/writereview?placeid={id}`. Server tidak fetch/resolve short-link Google.
-
-Mutasi yang ditandai kontrak memerlukan UUID `Idempotency-Key`. Retry jaringan memakai key, payload, dan `If-Match` yang sama. Setelah memperbaiki payload akibat 4xx, gunakan key baru; fingerprint kegagalan tetap terikat key tanpa menyimpan PIN/kode mentah. Replay sukses dievaluasi sebelum state/version, dan replay publik ditolak bila generation/kepemilikan/status berubah. Rahasia dukungan/rotasi direplay maksimal 15 menit dengan tombstone 24 jam.
-
-Gunakan ETag dari GET QR admin atau GET `/owner/me` sebagai `If-Match`, misalnya `"v3"`. Mutasi pemilik memerlukan cookie sesi, `Origin` persis `PUBLIC_ORIGIN`, dan `X-CSRF-Token` dari login atau GET `/owner/me`. Aktivasi dan claim grant juga memerlukan Origin, dan tidak otomatis membuat sesi. Setelah berhasil, pemilik login lewat `/api/v1/owner/sessions`.
-
-Alur produksi: buat batch → ekspor publik/rahasia → aktivasi dengan kode dan PIN → penjualan otomatis tercatat `SOLD`. Referensi internal `ACT-UUID` dibuat otomatis dan waktu penjualan mengikuti waktu aktivasi. `buyer_name` menyimpan nama toko pada aktivasi sebagai identitas toko pembeli; perubahan nama toko berikutnya tidak mengubah catatan penjualan. Catatan penjualan lama dipertahankan; endpoint penjualan manual tetap tersedia untuk kompatibilitas, tetapi formnya dihapus dari UI. Tidak diperlukan migrasi database baru. Dukungan reset/transfer memerlukan alasan dan referensi verifikasi oleh admin; pemeriksaan bukti dilakukan di luar aplikasi. Link claim memuat secret pada fragment, bukan query. UI menghapus fragment sebelum inisialisasi Auth, menyimpan grant hanya di memori halaman, lalu mengirimnya melalui POST. Membuka ulang halaman tanpa fragment memerlukan tautan lengkap dari admin.
-
-Rincian endpoint, payload, kode error, serta aturan bisnis tetap merujuk OpenAPI. [Pemetaan implementasi dan pengujian](docs/implementation.md) menjelaskan bukti backend untuk setiap acceptance criterion. [Runbook deployment dan pemulihan](docs/operations.md) memuat pengaturan worker, monitoring, serta backup.
-
-## Verifikasi
-
-```sh
-npm run typecheck
-npm run lint
-npm test
-npm run test:integration
-npm run build
-npm run verify:runtime
-npx playwright install chromium
-npm run verify:ui
-# Target resolver PRD: 20 req/detik selama 5 menit
-npm run verify:runtime -- --load
+```bash
+npm run worker -- --once
 ```
 
-Tes integrasi, runtime, dan browser membuat database sementara lalu menghapusnya, tanpa mengubah database aplikasi. Default memakai PostgreSQL lokal dan user OS. Set `TEST_DATABASE_URL` ke database kontrol khusus pengujian dengan izin create/drop database dan create/drop role untuk tes RLS. Runtime memerlukan `openssl`, build Next.js, dan port localhost bebas; menggunakan sertifikat HTTPS sementara dan Auth simulasi yang memverifikasi signature JWT. Tidak memasang sertifikat ke trust store OS. Browser verifier memakai Chromium desktop/mobile dan default build `.next-ui-verification`; buat dengan `QR_REVIEW_DIST_DIR=.next-ui-verification npm run build`. Untuk memakai build biasa, jalankan `QR_REVIEW_DIST_DIR=.next npm run verify:ui`.
+Job disimpan di PostgreSQL dengan lease dan kontrol konkurensi. Ekspor publik terpisah dari kode aktivasi; snapshot dan arsip rahasia tersimpan dalam bentuk terenkripsi.
 
-Uji mencakup aktivasi paralel, retry, version conflict, isolasi sesi, CSRF, shared rate limit, reset/transfer, pemisahan statistik, RLS, decode PNG, invalidasi ekspor, TTL, gangguan statistik, serta batas batch 500. Laporan lokal tersimpan di `artifacts/*.json` dan tangkapan UI di `artifacts/ui/`. [Cakupan UI](docs/ui-implementation.md) memuat rincian. Login UI dengan akun Supabase asli, deployment hosting, pemulihan produksi dan pilot fisik tetap memerlukan pengujian pada environment tersebut; tes lokal memakai Auth simulasi.
+### Pembersihan berkala
 
-Referensi implementasi: [Next.js Route Handlers](https://nextjs.org/docs/app/api-reference/file-conventions/route), [koneksi PostgreSQL Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres), [verifikasi user Supabase Auth](https://supabase.com/docs/reference/javascript/auth-getuser), [keamanan API Supabase](https://supabase.com/docs/guides/api/securing-your-api), dan [parameter scrypt OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt).
+Jadwalkan perintah berikut **setiap menit**:
 
-### Log aktivitas admin
+```bash
+npm run maintenance
+```
 
-Buka **Log Aktivitas** di sidebar admin (`/admin/activity`) untuk melihat riwayat seluruh QR. Filter tersedia untuk token/ID QR atau nama toko saat ini, jenis tindakan, dan tanggal inklusif dalam WIB. Setiap entri menampilkan waktu, jenis pelaku, alasan bila ada, detail perubahan, serta tautan ke tab Riwayat QR. Riwayat lama langsung tersedia; login dan kunjungan scan tidak termasuk log ini. API: `GET /api/v1/admin/audit-events`, memakai autentikasi dan allowlist admin yang sama.
+Rutinitas ini membersihkan rahasia kedaluwarsa, sesi lama, grant kedaluwarsa, bucket rate limit, dan scan event mentah berumur lebih dari 90 hari. Statistik agregat per kepemilikan dipertahankan. Expiry juga diperiksa pada operasi aplikasi, sehingga tidak bergantung pada ketepatan scheduler. Audit dan penjualan tidak dihapus otomatis.
 
-Jalankan `npm run db:migrate` sebelum deploy pembaruan ini untuk menambahkan indeks pagination log aktivitas. Migrasi tidak mengubah atau menghapus riwayat yang sudah ada.
+### Reset data operasional
 
-### Mulai ulang data aplikasi
+[`scripts/sql/reset-app-data.sql`](scripts/sql/reset-app-data.sql) tersedia untuk memulai ulang data operasional secara manual. Struktur database, ledger migrasi, allowlist admin, dan akun Supabase Auth dipertahankan. QR, sesi, dan link operasional sebelumnya tidak berlaku setelah reset. Periksa script dan simpan backup sebelum menjalankannya.
 
-Untuk mengosongkan seluruh data operasional, jalankan isi [reset-app-data.sql](scripts/sql/reset-app-data.sql) secara manual di Supabase SQL Editor sebagai pemilik schema, saat aplikasi dan worker tidak sedang digunakan. SQL menghapus seluruh batch, QR, penjualan, kepemilikan, kunjungan, log aktivitas, sesi pemilik, grant dukungan, ekspor, idempotency, dan rate limit. Setelah commit, QR dan link lama tidak berlaku lagi; simpan backup bila data masih diperlukan.
+## API dan akses
 
-Akun Supabase Auth, allowlist admin, ledger migrasi, struktur tabel, indeks, RLS, constraint, dan trigger dipertahankan. Setelah reset, admin tetap dapat login dan membuat batch baru. File reset berada di luar direktori migrasi dan tidak dijalankan saat deploy.
+Kontrak lengkap tersedia dalam [`openapi-qr-review-v0.1.yaml`](openapi-qr-review-v0.1.yaml).
 
-### Install ke home screen
+| Akses                  | Autentikasi                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| Admin                  | Bearer Supabase Auth yang diverifikasi server dan UUID dalam allowlist.       |
+| Pemilik                | Token dan PIN saat login; cookie Secure/HttpOnly serta CSRF untuk mutasi.     |
+| Aktivasi dan pemulihan | Kode aktivasi atau grant dukungan sesuai operasi, dengan pemeriksaan origin.  |
+| Scan publik            | `/r/{token}` memeriksa status unit dan mengarahkan QR aktif ke tujuan ulasan. |
 
-Aplikasi menyediakan `/manifest.webmanifest`, ikon PNG 192/512 px, ikon maskable, dan metadata Apple. Aplikasi yang diinstal terbuka dalam mode standalone dengan nama **QR Review**, langsung ke `/admin`. Jika belum login, aplikasi mengarahkan ke halaman login admin. Gunakan URL HTTPS production untuk instalasi; data tetap memerlukan koneksi internet.
+- Kontrol versi menggunakan `X-QR-If-Match: "vN"`, berdasarkan `version` dari API. `If-Match` standar juga diterima; gunakan `X-QR-If-Match` di Vercel.
+- Operasi yang ditandai kontrak memerlukan UUID `Idempotency-Key`. Retry jaringan memakai key, payload, dan versi awal yang sama.
+- PIN berupa string empat digit, termasuk nol awal. Body JSON dibatasi 16 KiB.
+- Link ulasan yang didukung: `https://g.page/r/{code}/review` dan `https://search.google.com/local/writereview?placeid={id}`. Server tidak me-resolve short-link Google.
+- Statistik menghitung kunjungan QR aktif yang memenuhi syarat, bukan ulasan yang dikirim ke Google. HEAD, bot/preview, dan trafik pengujian teridentifikasi dikecualikan.
+- API dan resolver menggunakan `Cache-Control: no-store`. Hosting perlu mempertahankan HTTPS dan forwarded headers yang tepercaya.
 
-Tombol **Install** tersedia di header admin dan halaman login admin. Halaman beranda dan kelola pemilik tidak menampilkan tombol install. Chrome/Edge membuka prompt instalasi ketika browser menyediakannya; jika belum tersedia, tombol menampilkan petunjuk melalui menu browser. Di iPhone/iPad, buka halaman admin di Safari, pilih **Bagikan → Tambahkan ke Layar Utama**, aktifkan **Buka sebagai App** jika tersedia, lalu **Tambah**. Tombol disembunyikan saat aplikasi dibuka dalam mode standalone.
+## Install ke home screen
 
-Tautan **Halaman pemilik** dari admin membuka jendela/tab terpisah. Saat halaman publik, bantuan, atau kelola pemilik dibuka di dalam aplikasi standalone, header menyediakan **Admin** untuk kembali ke `/admin`. Tautan kembali ini hanya muncul dalam mode aplikasi terpasang.
+Aplikasi menyediakan manifest, ikon, dan tampilan standalone. Tombol **Install** tersedia di header admin dan halaman login admin. Aplikasi terpasang dimulai dari `/admin`; jika belum ada sesi, pengguna diarahkan ke login.
+
+Gunakan tombol Install atau menu instalasi pada browser yang mendukungnya. Di Safari iPhone/iPad, pilih **Bagikan → Tambahkan ke Layar Utama**. Halaman publik di dalam aplikasi terpasang menyediakan akses kembali ke admin. Data tetap memerlukan koneksi internet.
+
+## Pengembangan dan pengujian
+
+| Perintah                           | Kegunaan                                      |
+| ---------------------------------- | --------------------------------------------- |
+| `npm run dev`                      | Development dengan HTTPS.                     |
+| `npm run build`                    | Build produksi.                               |
+| `npm start`                        | Server produksi; gunakan ingress HTTPS.       |
+| `npm run typecheck`                | Pemeriksaan TypeScript.                       |
+| `npm run lint`                     | Analisis statis.                              |
+| `npm test`                         | Tes unit.                                     |
+| `npm run test:integration`         | Tes integrasi PostgreSQL.                     |
+| `npm run verify:ui`                | Verifikasi browser Chromium.                  |
+| `npm run verify:runtime`           | Verifikasi resolver dan runtime.              |
+| `npm run verify:runtime -- --load` | Pengujian 20 request/detik selama lima menit. |
+
+Untuk verifikasi UI dengan build terpisah:
+
+```bash
+npx playwright install chromium
+QR_REVIEW_DIST_DIR=.next-ui-verification npm run build
+npm run verify:ui
+```
+
+Tes integrasi dan verifier membuat database sementara. Default menggunakan PostgreSQL lokal dan user sistem operasi. Jika diisi, `TEST_DATABASE_URL` harus menunjuk database kontrol khusus pengujian dengan izin create/drop database dan, untuk tes RLS, create/drop role. Verifier juga memerlukan `openssl` dan port localhost yang tersedia.
+
+Verifikasi UI menggunakan Auth simulasi dengan pemeriksaan signature JWT, tanpa mengubah data Supabase produksi. Login Supabase asli, deployment, restore, dan pencetakan fisik perlu diperiksa pada environment yang bersangkutan.
+
+Laporan tersedia dalam [verifikasi UI](artifacts/ui-verification.json), [verifikasi runtime](artifacts/runtime-verification.json), dan [cakupan implementasi](docs/implementation.md).
+
+## Struktur repository
+
+```text
+src/
+  app/                 Halaman, layout, dan route Next.js
+  components/          Antarmuka admin dan publik
+  hooks/               State dan aksi antarmuka
+  lib/                 Tipe, format, dan client API
+  server/              Domain, autentikasi, dan persistensi
+supabase/migrations/   Migrasi SQL
+scripts/               Provisioning, job, dan verifier
+scripts/sql/           Operasi SQL manual
+tests/                 Tes unit dan integrasi
+artifacts/             Laporan dan screenshot aplikasi
+docs/                  Dokumentasi teknis dan operasional
+```
+
+## Dokumentasi
+
+| Dokumen                                         | Isi                                                    |
+| ----------------------------------------------- | ------------------------------------------------------ |
+| [PRD](PRD_Akrilik_QR_Review_MVP.md)             | Scope awal, aturan produk, dan acceptance criteria.    |
+| [OpenAPI](openapi-qr-review-v0.1.yaml)          | Endpoint, payload, respons, dan error.                 |
+| [Implementasi backend](docs/implementation.md)  | Pemetaan aturan dan bukti pengujian.                   |
+| [Implementasi UI](docs/ui-implementation.md)    | Alur, komponen, dan bukti browser.                     |
+| [Operasional dan pemulihan](docs/operations.md) | Deployment, job, monitoring, TLS, backup, dan restore. |
+
+## Kredit
+
+Made by **[Rizkythegreat](https://rizkyrahmansalam.my.id)**.
