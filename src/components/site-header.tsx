@@ -1,5 +1,7 @@
 'use client';
 
+import { ThemeToggle } from '@/components/theme-toggle';
+
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ExternalLink } from 'lucide-react';
@@ -26,6 +28,7 @@ export function SiteHeader() {
         <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
         <span className="text-sm font-medium">{title}</span>
         <div className="ml-auto flex items-center gap-1">
+          <ThemeToggle />
           <InstallApp />
           <Button asChild variant="ghost" size="sm">
             <Link

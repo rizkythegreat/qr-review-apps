@@ -24,7 +24,7 @@ export const viewport: Viewport = { themeColor: '#171717' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="id" className={cn('font-sans', geist.variable)}>
+    <html lang="id" className={cn('font-sans', geist.variable)} suppressHydrationWarning>
       <body>
         <Script id="qr-review-grant" strategy="beforeInteractive">
           {captureGrant}
@@ -39,7 +39,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         >
           <TooltipProvider>
             {children}
-            <Toaster theme="light" richColors closeButton position="top-right" />
+            <Toaster richColors closeButton position="top-right" />
           </TooltipProvider>
         </Providers>
       </body>

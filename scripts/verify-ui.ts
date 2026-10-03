@@ -932,6 +932,45 @@ async function main() {
       'Installed admin retains its page when opening owner view, public pages provide return to admin, ordinary browser hides admin shortcut',
     );
 
+    stage = 'theme preferences';
+    await admin.goto(origin + '/admin');
+    await admin.getByRole('button', { name: 'Ubah tema', exact: true }).click();
+    await admin.getByRole('menuitemradio', { name: 'Gelap', exact: true }).click();
+    await expect(admin.locator('html')).toHaveClass(/dark/);
+    await admin.reload();
+    await expect(admin.locator('html')).toHaveClass(/dark/);
+    await expect(admin.getByText('Status layanan QR', { exact: true })).toBeVisible();
+    await screenshot(admin, 'dashboard-dark-mobile');
+    await admin.setViewportSize({ width: 1440, height: 1000 });
+    await screenshot(admin, 'dashboard-dark-desktop');
+    const themedPublic = await adminContext.newPage();
+    themedPublic.on('pageerror', (error) => consoleErrors.push(error.name));
+    await themedPublic.setViewportSize({ width: 390, height: 844 });
+    await themedPublic.goto(origin + '/manage');
+    await expect(themedPublic.locator('html')).toHaveClass(/dark/);
+    await expect(themedPublic.getByLabel(fieldLabel('PIN pemilik'))).toBeVisible();
+    expect(
+      await themedPublic.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    ).toBe(true);
+    await screenshot(themedPublic, 'owner-login-dark-mobile');
+    await themedPublic.close();
+    await admin.getByRole('button', { name: 'Ubah tema', exact: true }).click();
+    await admin.getByRole('menuitemradio', { name: 'Ikuti sistem', exact: true }).click();
+    await admin.emulateMedia({ colorScheme: 'dark' });
+    await expect(admin.locator('html')).toHaveClass(/dark/);
+    await admin.emulateMedia({ colorScheme: 'light' });
+    await expect(admin.locator('html')).not.toHaveClass(/dark/);
+    await admin.getByRole('button', { name: 'Ubah tema', exact: true }).click();
+    await admin.getByRole('menuitemradio', { name: 'Gelap', exact: true }).click();
+    await expect(admin.locator('html')).toHaveClass(/dark/);
+    await admin.getByRole('button', { name: 'Ubah tema', exact: true }).click();
+    await admin.getByRole('menuitemradio', { name: 'Terang', exact: true }).click();
+    await expect(admin.locator('html')).not.toHaveClass(/dark/);
+    await admin.setViewportSize({ width: 390, height: 844 });
+    mark(
+      'Light/dark/system themes, reload persistence, shared public theme, system changes and responsive dark screens',
+    );
+
     stage = 'admin logout';
     await admin.getByRole('button', { name: 'Buka navigasi', exact: true }).click();
     await admin.getByRole('button', { name: /Administrator/ }).click();
@@ -939,6 +978,10 @@ async function main() {
     await expect(admin).toHaveURL(/\/admin\/login/);
     await admin.goto(origin + '/admin');
     await expect(admin).toHaveURL(/\/admin\/login/);
+    await admin.getByRole('button', { name: 'Ubah tema', exact: true }).click();
+    await admin.getByRole('menuitemradio', { name: 'Gelap', exact: true }).click();
+    await expect(admin.locator('html')).toHaveClass(/dark/);
+    await screenshot(admin, 'login-dark-mobile');
     mark('Admin logout removes session and protected data');
 
     expect(consoleErrors).toEqual([]);

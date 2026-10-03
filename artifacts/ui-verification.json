@@ -1,5 +1,5 @@
 {
-  "verified_at": "2026-10-03T07:51:10.088Z",
+  "verified_at": "2026-10-03T10:58:11.596Z",
   "runtime": "Real production Next.js, temporary local PostgreSQL, signature-verified Auth simulation, Chromium desktop and mobile",
   "checks": [
     "Admin login, invalid credentials/allowlist, protected-route redirect and empty dashboard",
@@ -21,6 +21,7 @@
     "Service unavailable state and successful manual retry",
     "Responsive desktop/mobile, mobile sidebar closes, unknown QR/help/home",
     "Installed admin retains its page when opening owner view, public pages provide return to admin, ordinary browser hides admin shortcut",
+    "Light/dark/system themes, reload persistence, shared public theme, system changes and responsive dark screens",
     "Admin logout removes session and protected data"
   ],
   "browser_page_errors": 0,

@@ -164,10 +164,13 @@ export function StatusBadge({
       className={cn(
         'gap-1.5 whitespace-nowrap font-normal',
         ['ACTIVE', 'AVAILABLE'].includes(value) &&
-          'border-emerald-200 bg-emerald-50 text-emerald-800',
-        ['SUSPENDED', 'GENERATED'].includes(value) && 'border-amber-200 bg-amber-50 text-amber-800',
-        ['RETIRED', 'DAMAGED'].includes(value) && 'border-rose-200 bg-rose-50 text-rose-800',
-        value === 'SOLD' && 'border-blue-200 bg-blue-50 text-blue-800',
+          'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
+        ['SUSPENDED', 'GENERATED'].includes(value) &&
+          'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200',
+        ['RETIRED', 'DAMAGED'].includes(value) &&
+          'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200',
+        value === 'SOLD' &&
+          'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200',
       )}
     >
       <span className="size-1.5 rounded-full bg-current" />
@@ -269,7 +272,7 @@ export function SuccessState({
 }) {
   return (
     <div className="space-y-6 py-4 text-center">
-      <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+      <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
         <Check className="size-8" />
       </span>
       <div>

@@ -14,7 +14,7 @@ export function NavMain({ items }: { items: { title: string; url: string; icon: 
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
   return (
-    <SidebarMenu>
+    <SidebarMenu className="gap-2">
       {items.map((item) => (
         <SidebarMenuItem key={item.url}>
           <SidebarMenuButton

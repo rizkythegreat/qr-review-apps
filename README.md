@@ -44,6 +44,8 @@ Setelah server dan worker berjalan, gunakan urutan berikut:
 4. Pemilik membuka `/manage` menggunakan token dan PIN untuk memperbarui link, melihat kunjungan atau mengganti PIN.
 5. Admin menggunakan tab Dukungan di detail QR untuk reset PIN, transfer, rotasi kode, suspend/resume atau penonaktifan permanen. Bantuan penggunaan tersedia di `/help`.
 
+Tema tampilan dapat dipilih melalui tombol matahari/bulan di header atau halaman login: Terang, Gelap, atau Ikuti sistem. Preferensi tersimpan di browser dan berlaku untuk halaman admin serta publik/pemilik.
+
 Development memakai HTTPS agar cookie `__Host-owner_session` berfungsi. Next.js dapat membuat sertifikat development. Jika ingin memakai sertifikat lokal sendiri:
 
 ```sh

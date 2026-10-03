@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { ThemeProvider } from 'next-themes';
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { apiRequest, apiBlob, ApiFailure, type ApiOptions } from '@/lib/api';
@@ -58,9 +59,17 @@ export function Providers({
     };
   }, [supabaseUrl, publishableKey, queries]);
   return (
-    <QueryClientProvider client={queries}>
-      <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>
-    </QueryClientProvider>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+      storageKey="qr-review-theme"
+    >
+      <QueryClientProvider client={queries}>
+        <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 export function useAdminBlob() {

@@ -1,3 +1,4 @@
+import { ThemeToggle } from '@/components/theme-toggle';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArrowLeft, CircleHelp, ShieldCheck } from 'lucide-react';
@@ -21,11 +22,12 @@ export function PublicShell({
         <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-5 sm:px-8">
           <Brand />
           <div className="flex items-center gap-1">
+            <ThemeToggle />
             <ReturnToAdmin />
             <Button asChild variant="ghost" size="sm">
-              <Link href="/help">
+              <Link href="/help" aria-label="Bantuan">
                 <CircleHelp />
-                Bantuan
+                <span className="hidden sm:inline">Bantuan</span>
               </Link>
             </Button>
           </div>
