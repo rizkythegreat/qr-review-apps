@@ -1,5 +1,13 @@
 import Link from 'next/link';
-import { ArrowRight, Link2, QrCode, ShieldCheck } from 'lucide-react';
+import {
+  ArrowRight,
+  Link2,
+  QrCode,
+  ScanLine,
+  ShieldCheck,
+  SlidersHorizontal,
+  Store,
+} from 'lucide-react';
 import { PublicShell } from '@/components/public-shell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -60,6 +68,56 @@ export default function Home() {
             <span className="text-xs font-medium">Link dapat diperbarui</span>
           </div>
         </div>
+      </section>
+      <section
+        aria-labelledby="getting-started-heading"
+        className="mt-8 border-t pb-4 pt-8 md:mt-4 md:pt-10"
+      >
+        <h2
+          id="getting-started-heading"
+          className="text-xl font-semibold tracking-tight sm:text-2xl"
+        >
+          Mulai dalam 3 langkah
+        </h2>
+        <ol className="mt-6 grid gap-4 md:grid-cols-3">
+          {[
+            {
+              number: '01',
+              icon: ScanLine,
+              title: 'Aktifkan QR',
+              description: 'Scan QR, lalu masukkan kode aktivasi dan informasi toko.',
+            },
+            {
+              number: '02',
+              icon: Store,
+              title: 'Pasang di toko',
+              description:
+                'Letakkan QR di meja atau kasir agar pelanggan mudah membuka halaman ulasan.',
+            },
+            {
+              number: '03',
+              icon: SlidersHorizontal,
+              title: 'Kelola kapan saja',
+              description: 'Perbarui link ulasan dan lihat kunjungan tanpa mencetak ulang QR.',
+            },
+          ].map(({ number, icon: Icon, title, description }) => (
+            <li key={number} className="rounded-2xl border bg-background p-5 sm:p-6">
+              <div className="mb-5 flex items-center justify-between">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-[#eaf0e9] text-[#243829]">
+                  <Icon className="size-5" aria-hidden="true" />
+                </span>
+                <span
+                  className="text-sm font-medium tabular-nums text-muted-foreground"
+                  aria-hidden="true"
+                >
+                  {number}
+                </span>
+              </div>
+              <h3 className="text-base font-semibold">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+            </li>
+          ))}
+        </ol>
       </section>
     </PublicShell>
   );
