@@ -1,6 +1,7 @@
 export const routes = [
   ['GET', '/api/v1/admin/me', 'adminMe'],
   ['GET', '/api/v1/admin/dashboard', 'adminDashboard'],
+  ['GET', '/api/v1/admin/audit-events', 'listActivity'],
   ['POST', '/api/v1/admin/batches', 'createBatch'],
   ['GET', '/api/v1/admin/batches', 'listBatches'],
   ['GET', '/api/v1/admin/batches/{batch_id}', 'getBatch'],

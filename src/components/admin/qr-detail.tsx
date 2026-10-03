@@ -41,6 +41,7 @@ import { useAdminApi, useAdminAuth, useAdminBlob } from '@/components/providers'
 import { useAdminList, useAdminResource } from '@/hooks/use-admin-resource';
 import { useAction } from '@/hooks/use-action';
 import { dateTime } from '@/lib/format';
+import { auditActions } from '@/lib/audit';
 import { saveBlob } from '@/lib/api';
 import { SupportActions } from './support-actions';
 import type { AdminQr, AuditEvent, Sale } from '@/lib/types';
@@ -459,26 +460,6 @@ function SaleInformation({ qrId }: { qrId: string }) {
     </Card>
   );
 }
-const actions: Record<string, string> = {
-  BATCH_GENERATED: 'Unit dibuat',
-  STOCK_AVAILABLE: 'Lolos QC',
-  STOCK_DAMAGED: 'Unit rusak',
-  SALE_RECORDED: 'Penjualan tercatat',
-  ACTIVATED: 'QR diaktifkan',
-  OWNER_UPDATED: 'Data toko diubah',
-  PIN_CHANGED: 'PIN diubah',
-  PIN_RESET_GRANT_CREATED: 'Tautan reset PIN dibuat',
-  OWNERSHIP_TRANSFER_GRANT_CREATED: 'Tautan transfer dibuat',
-  PIN_RESET_CLAIMED: 'PIN dipulihkan',
-  OWNERSHIP_TRANSFER_CLAIMED: 'Kepemilikan dipindahkan',
-  SUSPENDED: 'QR ditangguhkan',
-  RESUMED: 'QR dilanjutkan',
-  RETIRED: 'QR dinonaktifkan',
-  suspendQr: 'QR ditangguhkan',
-  resumeQr: 'QR dilanjutkan',
-  retireQr: 'QR dinonaktifkan',
-  ACTIVATION_CODE_ROTATED: 'Kode aktivasi dirotasi',
-};
 export function AuditLog({ qrId }: { qrId: string }) {
   const query = useAdminList<AuditEvent>(`/api/v1/admin/qr-codes/${qrId}/audit-events`);
   const rows = query.data?.pages.flatMap((page) => page.data) || [];
@@ -502,7 +483,7 @@ export function AuditLog({ qrId }: { qrId: string }) {
                 <span className="absolute -left-1.5 top-1 size-3 rounded-full border-2 border-background bg-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap justify-between gap-2">
-                    <p className="text-sm font-medium">{actions[row.action] || row.action}</p>
+                    <p className="text-sm font-medium">{auditActions[row.action] || row.action}</p>
                     <p className="text-xs text-muted-foreground">{dateTime(row.created_at)}</p>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">

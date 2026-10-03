@@ -14,7 +14,6 @@ import { PNG } from 'pngjs';
 import jsQR from 'jsqr';
 import { testDatabase } from '../tests/helpers/database';
 import { decrypt } from '../src/server/crypto';
-import { processOneExport } from '../src/server/exports';
 
 // Every database write targets an ephemeral local database. No .env.local credentials are read.
 function fieldLabel(label: string) {
@@ -281,7 +280,7 @@ async function main() {
           const headers = route.request().headers();
           retries.push({
             key: headers['idempotency-key'],
-            etag: headers['if-match'],
+            etag: headers['x-qr-if-match'],
             body: route.request().postData() || '',
           });
           if (retries.length === 1) {
@@ -399,16 +398,12 @@ async function main() {
     stage = 'exports';
     await admin.getByLabel(fieldLabel('Ukuran (px)')).fill('256');
     await admin.getByRole('button', { name: 'Siapkan QR publik', exact: true }).click();
-    await expect(admin.getByText('Dalam antrean', { exact: true })).toBeVisible();
     await admin.getByRole('button', { name: 'Siapkan kode aktivasi', exact: true }).click();
     await expect
       .poll(async () =>
         Number((await db.pool.query('SELECT count(*) FROM qr_review.export_jobs')).rows[0].count),
       )
       .toBe(2);
-    const exportConfig = { ...db.config, PUBLIC_ORIGIN: origin };
-    await processOneExport(db.pool, exportConfig);
-    await processOneExport(db.pool, exportConfig);
     await expect(admin.getByRole('button', { name: 'Unduh ZIP', exact: true })).toHaveCount(2, {
       timeout: 15000,
     });
@@ -432,7 +427,7 @@ async function main() {
     ).toBeTruthy();
     expect(Object.keys(secretZip.files).some((name) => name.endsWith('.png'))).toBeFalsy();
     await screenshot(admin, 'batch-desktop');
-    mark('Separate public/secret exports, worker polling, ZIP download and PNG decode');
+    mark('Separate public/secret exports, background polling, ZIP download and PNG decode');
 
     stage = 'QR pagination and filters';
     await admin.getByRole('button', { name: /Muat/ }).click();
@@ -512,7 +507,7 @@ async function main() {
     await owner.getByRole('button', { name: 'Simpan perubahan', exact: true }).click();
     const editHeaders = (await editRequest).headers();
     expect(editHeaders['x-csrf-token']).toBeTruthy();
-    expect(editHeaders['if-match']).toMatch(/^"v\d+"$/);
+    expect(editHeaders['x-qr-if-match']).toMatch(/^"v\d+"$/);
     await expect(
       owner.getByRole('heading', { name: 'Kopi Bahagia Baru', exact: true }),
     ).toBeVisible();
@@ -526,8 +521,12 @@ async function main() {
     expect(head.status()).toBe(302);
     expect((await head.body()).length).toBe(0);
     await owner.getByRole('button', { name: 'Perbarui statistik', exact: true }).click();
-    const stats = await ownerContext.request.get(origin + '/api/v1/owner/me/stats');
-    expect((await stats.json()).data.total_visits).toBe(1);
+    await expect
+      .poll(async () => {
+        const stats = await ownerContext.request.get(origin + '/api/v1/owner/me/stats');
+        return (await stats.json()).data.total_visits;
+      })
+      .toBe(1);
     await screenshot(owner, 'owner-mobile');
     await owner.setViewportSize({ width: 1440, height: 1000 });
     await screenshot(owner, 'owner-desktop');
@@ -679,6 +678,53 @@ async function main() {
     await admin.getByRole('tab', { name: 'Riwayat', exact: true }).click();
     await expect(admin.getByText('QR dinonaktifkan', { exact: true })).toBeVisible();
     mark('Suspend fallback/read-only, resume redirect, irreversible retire and audit trail');
+
+    stage = 'global activity log';
+    await admin.getByRole('link', { name: 'Log Aktivitas', exact: true }).click();
+    await expect(admin.getByRole('heading', { name: 'Log Aktivitas', exact: true })).toBeVisible();
+    await expect(
+      admin.getByRole('button', { name: 'Muat lebih banyak', exact: true }),
+    ).toBeVisible();
+    const activityCount = await admin.locator('ol > li').count();
+    await admin.getByRole('button', { name: 'Muat lebih banyak', exact: true }).click();
+    await expect.poll(() => admin.locator('ol > li').count()).toBeGreaterThan(activityCount);
+    await admin.getByLabel('Cari QR atau toko', { exact: true }).fill(qr.token);
+    await admin.getByRole('combobox', { name: 'Tindakan', exact: true }).click();
+    await admin.getByRole('option', { name: 'QR dinonaktifkan', exact: true }).click();
+    const todayWib = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(
+      new Date(),
+    );
+    await admin.getByLabel('Dari tanggal', { exact: true }).fill(todayWib);
+    await admin.getByLabel('Sampai tanggal', { exact: true }).fill(todayWib);
+    await admin.getByRole('button', { name: 'Terapkan filter', exact: true }).click();
+    await expect(admin.locator('ol > li')).toHaveCount(1);
+    await expect(admin.locator('ol').getByText('QR dinonaktifkan', { exact: true })).toBeVisible();
+    await admin.getByText('Lihat perubahan', { exact: true }).click();
+    await expect(admin.locator('pre')).toContainText('RETIRED');
+    const closeToast = admin.locator('[data-sonner-toast] [data-close-button]');
+    if (await closeToast.count()) await closeToast.first().click();
+    await screenshot(admin, 'activity-desktop');
+    await admin.setViewportSize({ width: 820, height: 1180 });
+    await screenshot(admin, 'activity-ipad');
+    await admin.setViewportSize({ width: 390, height: 844 });
+    await screenshot(admin, 'activity-mobile');
+    await admin.getByLabel('Cari QR atau toko', { exact: true }).fill('not-found');
+    await admin.getByRole('button', { name: 'Terapkan filter', exact: true }).click();
+    await expect(
+      admin.getByRole('heading', { name: 'Tidak ada aktivitas yang cocok', exact: true }),
+    ).toBeVisible();
+    await admin.getByRole('button', { name: 'Hapus filter', exact: true }).click();
+    await expect(admin.locator('ol > li').first()).toBeVisible();
+    await admin.getByRole('button', { name: 'Perbarui aktivitas', exact: true }).click();
+    await admin.locator(`a[href="/admin/qr-codes/${qr.id}?tab=audit"]`).first().click();
+    await expect(admin.getByRole('tab', { name: 'Riwayat', exact: true })).toHaveAttribute(
+      'data-state',
+      'active',
+    );
+    await admin.setViewportSize({ width: 1440, height: 1000 });
+    mark(
+      'Global activity, pagination, QR/action/WIB dates, details, empty/reset/refresh, QR history link and responsive layouts',
+    );
 
     stage = 'rotation and damage';
     const rotatedCode = await support(

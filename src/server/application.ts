@@ -35,6 +35,7 @@ import {
   source,
 } from './http';
 import { type Visit, recordVisit, shouldCount } from './statistics';
+import { auditActions, auditActionAliases } from '../lib/audit';
 
 const listSchema = z.strictObject({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -46,6 +47,17 @@ const qrListSchema = listSchema.extend({
   stock_status: z.enum(['GENERATED', 'AVAILABLE', 'SOLD', 'DAMAGED']).optional(),
   batch_id: uuid.optional(),
 });
+const activitySchema = listSchema
+  .extend({
+    search: z.string().trim().min(1).max(120).optional(),
+    action: z
+      .string()
+      .refine((value) => Object.hasOwn(auditActions, value))
+      .optional(),
+    from: z.iso.date().optional(),
+    to: z.iso.date().optional(),
+  })
+  .refine((value) => !value.from || !value.to || value.from <= value.to);
 const imageSchema = z.strictObject({
   format: z.enum(['png', 'svg']).default('png'),
   size_px: z.coerce.number().int().min(256).max(2048).default(1024),
@@ -94,7 +106,13 @@ export class Application {
       const query = Object.fromEntries(url.searchParams.entries());
       if ([...url.searchParams.keys()].length !== Object.keys(query).length)
         throw new ApiError(400, 'INVALID_PARAMETER', 'Parameter duplikat tidak diizinkan.');
-      const allowedQuery = ['listQr', 'listBatches', 'listAuditEvents', 'getQrImage'].includes(op);
+      const allowedQuery = [
+        'listQr',
+        'listBatches',
+        'listAuditEvents',
+        'listActivity',
+        'getQrImage',
+      ].includes(op);
       if (!allowedQuery && Object.keys(query).length)
         throw new ApiError(400, 'INVALID_PARAMETER', 'Parameter tidak diizinkan.');
       let raw: unknown;
@@ -270,6 +288,8 @@ export class Application {
       case 'listAuditEvents':
         await getQr(this.pool, p.qr_id);
         return this.list(op, query, p);
+      case 'listActivity':
+        return this.activity(query);
       case 'getPublicQr': {
         const q = await getQr(this.pool, p.token, true);
         return {
@@ -366,6 +386,58 @@ export class Application {
         );
       }
     }
+  }
+  private async activity(input: Record<string, string>): Promise<Result> {
+    const parsed = activitySchema.safeParse(input);
+    if (!parsed.success)
+      throw new ApiError(400, 'INVALID_PARAMETER', 'Filter aktivitas tidak valid.');
+    const { limit, cursor, ...filters } = parsed.data;
+    const filter = { operation: 'listActivity', ...filters };
+    const position = decodeCursor(this.config, cursor, filter);
+    const where: string[] = [];
+    const values: unknown[] = [];
+    const add = (value: unknown) => {
+      values.push(value);
+      return `$${values.length}`;
+    };
+    if (position)
+      where.push(
+        `(e.created_at,e.id)<(${add(position.created_at)}::timestamptz,${add(position.id)}::uuid)`,
+      );
+    if (filters.search) {
+      const value = add(filters.search);
+      where.push(
+        `(q.token=${value} OR q.id::text=${value} OR strpos(lower(q.store_name),lower(${value}))>0)`,
+      );
+    }
+    if (filters.action)
+      where.push(
+        `e.action=ANY(${add(auditActionAliases[filters.action] || [filters.action])}::text[])`,
+      );
+    // Inclusive calendar dates in WIB, independent of the database session timezone.
+    if (filters.from)
+      where.push(`e.created_at>=${add(filters.from + 'T00:00:00+07:00')}::timestamptz`);
+    if (filters.to)
+      where.push(
+        `e.created_at<(${add(filters.to + 'T00:00:00+07:00')}::timestamptz + interval '24 hours')`,
+      );
+    const rows = (
+      await this.pool.query<PageRow>(
+        `SELECT e.*,q.token AS qr_token,q.store_name FROM qr_review.audit_events e
+       JOIN qr_review.qr_codes q ON q.id=e.qr_id
+       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+       ORDER BY e.created_at DESC,e.id DESC LIMIT ${add(limit + 1)}`,
+        values,
+      )
+    ).rows;
+    const page = rows.slice(0, limit);
+    return {
+      data: page,
+      pagination: {
+        limit,
+        next_cursor: rows.length > limit ? encodeCursor(this.config, page.at(-1)!, filter) : null,
+      },
+    };
   }
   private async list(
     op: 'listBatches' | 'listQr' | 'listAuditEvents',

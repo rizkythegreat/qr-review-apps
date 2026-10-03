@@ -1,10 +1,10 @@
 {
-  "verified_at": "2026-10-02T16:09:11.724Z",
+  "verified_at": "2026-10-03T04:57:43.361Z",
   "runtime": "Real production Next.js, temporary local PostgreSQL, signature-verified Auth simulation, Chromium desktop and mobile",
   "checks": [
     "Admin login, invalid credentials/allowlist, protected-route redirect and empty dashboard",
     "Create batch: committed response lost, identical retry, one batch only",
-    "Separate public/secret exports, worker polling, ZIP download and PNG decode",
+    "Separate public/secret exports, background polling, ZIP download and PNG decode",
     "QR search and cursor pagination",
     "Activation blocked before sale, QC, recorded sale and SVG download",
     "Printed /r URL renders activation, link/PIN field validation, leading-zero PIN",
@@ -14,6 +14,7 @@
     "Verified PIN reset, secret fragment scrubbed before requests, no secret storage, incomplete link",
     "Transfer grant, suspended read-only owner, new owner PIN/store and isolated statistics",
     "Suspend fallback/read-only, resume redirect, irreversible retire and audit trail",
+    "Global activity, pagination, QR/action/WIB dates, details, empty/reset/refresh, QR history link and responsive layouts",
     "Activation code rotation, damaged stock retirement, secret export invalidation",
     "Rotated code activates, old code rejected, expired session returns to login",
     "Persisted credential rate limit displays countdown and disables submit",

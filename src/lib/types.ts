@@ -101,6 +101,10 @@ export interface AuditEvent {
   reason: string | null;
   changes: Record<string, unknown>;
 }
+export interface ActivityEvent extends AuditEvent {
+  qr_token: string;
+  store_name: string | null;
+}
 export interface ApiResponse<T> {
   data: T;
   request_id: string;

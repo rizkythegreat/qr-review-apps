@@ -1267,6 +1267,95 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SupportGrantCreate'
+  /api/v1/admin/audit-events:
+    get:
+      operationId: listActivity
+      summary: Log aktivitas seluruh QR
+      description: Riwayat seluruh QR, terbaru dahulu. Pencarian memakai token atau ID
+        QR persis, atau bagian nama toko saat ini. Tanggal from/to inklusif dalam
+        WIB (Asia/Jakarta); from harus tidak lebih besar dari to. Cursor terikat
+        pada seluruh filter. Tidak mencatat login atau kunjungan scan.
+      tags:
+        - Support
+      security:
+        - AdminBearer: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - in: query
+          name: search
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 120
+          description: Token, ID QR, atau nama toko saat ini.
+        - in: query
+          name: action
+          schema:
+            type: string
+            enum:
+              - BATCH_GENERATED
+              - STOCK_AVAILABLE
+              - STOCK_DAMAGED
+              - SALE_RECORDED
+              - ACTIVATED
+              - OWNER_UPDATED
+              - PIN_CHANGED
+              - PIN_RESET_GRANT_CREATED
+              - OWNERSHIP_TRANSFER_GRANT_CREATED
+              - PIN_RESET_CLAIMED
+              - OWNERSHIP_TRANSFER_CLAIMED
+              - suspendQr
+              - resumeQr
+              - retireQr
+              - ACTIVATION_CODE_ROTATED
+              - SUSPENDED
+              - RESUMED
+              - RETIRED
+          description: Jenis tindakan. suspendQr/resumeQr/retireQr juga mencakup nama
+            historis SUSPENDED/RESUMED/RETIRED.
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date
+          description: Tanggal inklusif dalam WIB, YYYY-MM-DD.
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date
+          description: Tanggal inklusif dalam WIB, YYYY-MM-DD.
+      responses:
+        "200":
+          description: Berhasil.
+          headers:
+            Cache-Control:
+              description: "Semua JSON, HTML dan unduhan: no-store. Semua resolver responses:
+                no-store, max-age=0. CDN harus bypass cache."
+              schema:
+                type: string
+                example: no-store
+            X-Request-Id:
+              description: ID tracing nonrahasia; sama dengan request_id JSON.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityEventListResponse"
+        "400":
+          $ref: "#/components/responses/Error400"
+        "401":
+          $ref: "#/components/responses/Error401"
+        "403":
+          $ref: "#/components/responses/Error403"
+        "429":
+          $ref: "#/components/responses/Error429"
+        "500":
+          $ref: "#/components/responses/Error500"
+        "503":
+          $ref: "#/components/responses/Error503"
   /api/v1/admin/qr-codes/{qr_id}/audit-events:
     get:
       operationId: listAuditEvents
@@ -3250,6 +3339,70 @@ components:
       - data
       - pagination
       - request_id
+    ActivityEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        qr_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        actor_type:
+          type: string
+          enum:
+            - ADMIN
+            - OWNER
+            - SYSTEM
+        actor_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          nullable: true
+        changes:
+          type: object
+          additionalProperties: true
+          description: Hanya perubahan nonrahasia; tidak ada PIN, kode, grant, cookie atau key.
+        qr_token:
+          type: string
+        store_name:
+          type: string
+          nullable: true
+          description: Nama toko saat ini.
+      required:
+        - id
+        - qr_id
+        - action
+        - actor_type
+        - actor_id
+        - created_at
+        - reason
+        - changes
+        - qr_token
+        - store_name
+    ActivityEventListResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityEvent"
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+        request_id:
+          type: string
+      required:
+        - data
+        - pagination
+        - request_id
   responses:
     Error400:
       description: Request JSON atau parameter salah.

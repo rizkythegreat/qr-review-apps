@@ -1,6 +1,6 @@
 # QR Review — MVP
 
-Implementasi Next.js berdasarkan [PRD](PRD_Akrilik_QR_Review_MVP.md) dan [OpenAPI v0.1](openapi-qr-review-v0.1.yaml). Semua 31 operasi API aplikasi serta GET/HEAD resolver tersedia. UI menggunakan Tailwind CSS v4 dan komponen shadcn/ui, dengan adaptasi blocks resmi `login-04` dan `dashboard-01`. Halaman admin, aktivasi, kelola pemilik, dan dukungan terhubung ke API aplikasi.
+Implementasi Next.js berdasarkan [PRD](PRD_Akrilik_QR_Review_MVP.md) dan [OpenAPI v0.1](openapi-qr-review-v0.1.yaml). Semua 32 operasi API aplikasi serta GET/HEAD resolver tersedia. UI menggunakan Tailwind CSS v4 dan komponen shadcn/ui, dengan adaptasi blocks resmi `login-04` dan `dashboard-01`. Halaman admin, aktivasi, kelola pemilik, dan dukungan terhubung ke API aplikasi.
 
 Next.js menjalankan API di Node.js. Database adalah PostgreSQL Supabase melalui koneksi server `pg`, sehingga perubahan stok, aktivasi, audit, sesi, dan grant dapat memakai satu transaksi. Supabase Auth memverifikasi bearer admin; allowlist admin tersimpan di database. Pemilik memakai PIN dan sesi opaque tanpa akun Supabase. Aplikasi tidak memerlukan service-role key di browser maupun untuk akses PostgreSQL.
 
@@ -97,3 +97,9 @@ Tes integrasi, runtime, dan browser membuat database sementara lalu menghapusnya
 Uji mencakup aktivasi paralel, retry, version conflict, isolasi sesi, CSRF, shared rate limit, reset/transfer, pemisahan statistik, RLS, decode PNG, invalidasi ekspor, TTL, gangguan statistik, serta batas batch 500. Laporan lokal tersimpan di `artifacts/*.json` dan tangkapan UI di `artifacts/ui/`. [Cakupan UI](docs/ui-implementation.md) memuat rincian. Login UI dengan akun Supabase asli, deployment hosting, pemulihan produksi dan pilot fisik tetap memerlukan pengujian pada environment tersebut; tes lokal memakai Auth simulasi.
 
 Referensi implementasi: [Next.js Route Handlers](https://nextjs.org/docs/app/api-reference/file-conventions/route), [koneksi PostgreSQL Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres), [verifikasi user Supabase Auth](https://supabase.com/docs/reference/javascript/auth-getuser), [keamanan API Supabase](https://supabase.com/docs/guides/api/securing-your-api), dan [parameter scrypt OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt).
+
+### Log aktivitas admin
+
+Buka **Log Aktivitas** di sidebar admin (`/admin/activity`) untuk melihat riwayat seluruh QR. Filter tersedia untuk token/ID QR atau nama toko saat ini, jenis tindakan, dan tanggal inklusif dalam WIB. Setiap entri menampilkan waktu, jenis pelaku, alasan bila ada, detail perubahan, serta tautan ke tab Riwayat QR. Riwayat lama langsung tersedia; login dan kunjungan scan tidak termasuk log ini. API: `GET /api/v1/admin/audit-events`, memakai autentikasi dan allowlist admin yang sama.
+
+Jalankan `npm run db:migrate` sebelum deploy pembaruan ini untuk menambahkan indeks pagination log aktivitas. Migrasi tidak mengubah atau menghapus riwayat yang sudah ada.

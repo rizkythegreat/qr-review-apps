@@ -15,7 +15,9 @@ export function SiteHeader() {
       ? 'Daftar QR'
       : pathname.startsWith('/admin/support')
         ? 'Dukungan'
-        : 'Dashboard';
+        : pathname.startsWith('/admin/activity')
+          ? 'Log Aktivitas'
+          : 'Dashboard';
   return (
     <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur">
       <div className="flex w-full items-center gap-2 px-4 lg:px-6">

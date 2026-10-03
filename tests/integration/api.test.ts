@@ -1024,6 +1024,115 @@ describe('activation, owner sessions and resolver', () => {
   });
 });
 
+describe('global admin activity', () => {
+  it('requires an authenticated allowlisted admin', async () => {
+    expect(
+      (await call('GET', '/api/v1/admin/audit-events', undefined, { admin: null })).status,
+    ).toBe(401);
+    expect(
+      (await call('GET', '/api/v1/admin/audit-events', undefined, { admin: 'outside' })).status,
+    ).toBe(403);
+  });
+
+  it('includes existing events across QR units with stable pagination and bound filters', async () => {
+    const b = await batch(3);
+    const all = await call('GET', '/api/v1/admin/audit-events');
+    expect(all.status).toBe(200);
+    expect(all.data).toHaveLength(3);
+    expect(new Set(all.data.map((row: any) => row.qr_id))).toEqual(
+      new Set(b.qr.map((q: any) => q.id)),
+    );
+    for (const row of all.data) {
+      expect(row.qr_token).toBe(b.qr.find((q: any) => q.id === row.qr_id).token);
+      expect(row.action).toBe('BATCH_GENERATED');
+      expect(row.store_name).toBeNull();
+    }
+    const ids: string[] = [];
+    let cursor = '';
+    do {
+      const page = await call(
+        'GET',
+        `/api/v1/admin/audit-events?limit=1${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+      );
+      ids.push(...page.data.map((row: any) => row.id));
+      cursor = page.pagination.next_cursor;
+      if (cursor) {
+        expect(
+          (
+            await call(
+              'GET',
+              `/api/v1/admin/audit-events?action=STOCK_AVAILABLE&cursor=${encodeURIComponent(cursor)}`,
+            )
+          ).error.code,
+        ).toBe('INVALID_CURSOR');
+        expect(
+          (
+            await call(
+              'GET',
+              `/api/v1/admin/audit-events?from=2020-01-01&cursor=${encodeURIComponent(cursor)}`,
+            )
+          ).error.code,
+        ).toBe('INVALID_CURSOR');
+      }
+    } while (cursor);
+    expect(ids).toEqual(all.data.map((row: any) => row.id));
+    expect(new Set(ids).size).toBe(3);
+    for (const search of [b.qr[0].token, b.qr[0].id]) {
+      const filtered = await call('GET', `/api/v1/admin/audit-events?search=${search}`);
+      expect(filtered.data).toHaveLength(1);
+      expect(filtered.data[0].qr_id).toBe(b.qr[0].id);
+    }
+    expect((await call('GET', '/api/v1/admin/audit-events?search=missing')).data).toEqual([]);
+    expect(JSON.stringify(all.json)).not.toContain(b.codes[0].activation_code);
+  });
+
+  it('filters names, actions and inclusive WIB dates at midnight boundaries', async () => {
+    const b = await batch(2);
+    await db.pool.query('UPDATE qr_review.qr_codes SET store_name=$2 WHERE id=$1', [
+      b.qr[0].id,
+      'Toko Kopi',
+    ]);
+    const dates = [
+      '2020-01-01T16:59:59.999Z',
+      '2020-01-01T17:00:00.000Z',
+      '2020-01-02T16:59:59.999Z',
+      '2020-01-02T17:00:00.000Z',
+    ];
+    const ids = dates.map(() => randomUUID());
+    for (let i = 0; i < dates.length; i++)
+      await db.pool.query(
+        `INSERT INTO qr_review.audit_events(id,qr_id,action,actor_type,changes,created_at) VALUES($1,$2,$3,'ADMIN','{}',$4)`,
+        [ids[i], b.qr[0].id, i === 2 ? 'SUSPENDED' : 'suspendQr', dates[i]],
+      );
+    const filtered = await call(
+      'GET',
+      '/api/v1/admin/audit-events?search=kOpI&action=suspendQr&from=2020-01-02&to=2020-01-02',
+    );
+    expect(filtered.status).toBe(200);
+    expect(filtered.data.map((row: any) => row.id)).toEqual([ids[2], ids[1]]);
+    expect(filtered.data.every((row: any) => row.store_name === 'Toko Kopi')).toBe(true);
+    expect((await call('GET', '/api/v1/admin/audit-events?action=SALE_RECORDED')).data).toEqual([]);
+  });
+
+  it('rejects malformed filters, reversed dates, duplicate parameters and invalid cursors', async () => {
+    for (const query of [
+      'from=2020-02-30',
+      'from=2020-01-03&to=2020-01-02',
+      'action=unknown',
+      'search=',
+      'limit=101',
+      'unexpected=true',
+      'action=ACTIVATED&action=OWNER_UPDATED',
+    ])
+      expect((await call('GET', `/api/v1/admin/audit-events?${query}`)).error.code).toBe(
+        'INVALID_PARAMETER',
+      );
+    expect((await call('GET', '/api/v1/admin/audit-events?cursor=invalid')).error.code).toBe(
+      'INVALID_CURSOR',
+    );
+  });
+});
+
 describe('support, audit and durable retention', () => {
   it('claims reset once, preserves URL/ownership/status, revokes sessions and permits a matching retry', async () => {
     const b = await active(),
