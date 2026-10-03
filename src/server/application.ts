@@ -238,6 +238,8 @@ export class Application {
         const q = await getQr(this.pool, p.qr_id);
         return { data: adminView(this.config, q), headers: etag(q) };
       }
+      case 'getActivationCode':
+        return this.domain.run(undefined, (db) => this.domain.revealActivationCode(db, p.qr_id));
       case 'getQrImage': {
         const q = await getQr(this.pool, p.qr_id);
         const parsed = imageSchema.safeParse(query);

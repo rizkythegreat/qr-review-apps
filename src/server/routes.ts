@@ -17,6 +17,7 @@ export const routes = [
   ['POST', '/api/v1/admin/qr-codes/{qr_id}/suspend', 'suspendQr'],
   ['POST', '/api/v1/admin/qr-codes/{qr_id}/resume', 'resumeQr'],
   ['POST', '/api/v1/admin/qr-codes/{qr_id}/retire', 'retireQr'],
+  ['GET', '/api/v1/admin/qr-codes/{qr_id}/activation-code', 'getActivationCode'],
   ['POST', '/api/v1/admin/qr-codes/{qr_id}/activation-code/rotate', 'rotateActivationCode'],
   ['POST', '/api/v1/admin/qr-codes/{qr_id}/pin-reset-grants', 'createPinResetGrant'],
   ['POST', '/api/v1/admin/qr-codes/{qr_id}/transfer-grants', 'createTransferGrant'],

@@ -443,6 +443,16 @@ async function main() {
     await owner.goto(`${origin}/r/${qr.token}`);
     await expect(owner.getByLabel(fieldLabel('Kode aktivasi'))).toBeVisible();
     await admin.goto(`${origin}/admin/qr-codes/${qr.id}`);
+    const unitCode = codes.find((item) => item.token === qr.token)!.activation_code;
+    await expect(admin.getByText(unitCode, { exact: true })).toHaveCount(0);
+    await admin.getByRole('button', { name: 'Lihat kode aktivasi', exact: true }).click();
+    await expect(admin.getByText(unitCode, { exact: true })).toBeVisible();
+    await admin.getByRole('button', { name: 'Sembunyikan kode aktivasi', exact: true }).click();
+    await expect(admin.getByText(unitCode, { exact: true })).toHaveCount(0);
+    await admin.getByRole('button', { name: 'Lihat kode aktivasi', exact: true }).click();
+    await expect(admin.getByText(unitCode, { exact: true })).toBeVisible();
+    await admin.evaluate(() => window.dispatchEvent(new Event('blur')));
+    await expect(admin.getByText(unitCode, { exact: true })).toHaveCount(0);
     await expect(admin.getByRole('button', { name: 'Catat penjualan', exact: true })).toHaveCount(
       0,
     );
@@ -457,8 +467,10 @@ async function main() {
     expect(
       (await readFile((await (await svgDownload).path())!, 'utf8')).includes('<svg'),
     ).toBeTruthy();
-    await screenshot(admin, 'qr-desktop');
-    mark('Activation available immediately, automatic sale pending and SVG download');
+    await screenshot(admin, 'qr-unit-desktop');
+    mark(
+      'Masked activation code, on-demand reveal/hide/blur, activation available immediately, automatic sale pending and SVG download',
+    );
 
     stage = 'activation';
     const response = await owner.goto(`${origin}/r/${qr.token}`);
@@ -493,6 +505,12 @@ async function main() {
     await owner.getByRole('button', { name: 'Aktifkan QR toko', exact: true }).click();
     await expect(owner.getByText('QR toko sudah aktif!', { exact: true })).toBeVisible();
     await admin.reload();
+    await expect(
+      admin.getByText('Kode sudah digunakan saat aktivasi.', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      admin.getByRole('button', { name: 'Lihat kode aktivasi', exact: true }),
+    ).toHaveCount(0);
     await admin.getByRole('tab', { name: 'Penjualan', exact: true }).click();
     await expect(admin.getByText('Penjualan tercatat', { exact: true })).toBeVisible();
     await expect(admin.getByText(/^ACT-[0-9a-f-]{36}$/)).toBeVisible();

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -10,6 +10,8 @@ import {
   ClipboardCheck,
   Download,
   ExternalLink,
+  Eye,
+  EyeOff,
   Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -109,6 +111,7 @@ export function QrDetail({ id, initialTab = 'overview' }: { id: string; initialT
                     <CopyButton value={qr.public_url} label="Salin link" />
                   </div>
                 </div>
+                <ActivationCode key={`${qr.id}:${qr.version}`} qr={qr} />
                 <div className="grid gap-5 border-t pt-5 sm:grid-cols-2">
                   <Detail label="Dibuat" value={dateTime(qr.created_at)} />
                   <Detail label="Aktivasi" value={dateTime(qr.activated_at)} />
@@ -312,6 +315,82 @@ function DamageAction({ qr, etag }: { qr: AdminQr; etag: string | null }) {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+type ActivationCodeResult = { qr_id: string; activation_code: string; expires_at: string };
+function ActivationCode({ qr }: { qr: AdminQr }) {
+  const api = useAdminApi();
+  const [revealed, setRevealed] = useState<ActivationCodeResult | null>(null);
+  const action = useAction(() =>
+    api<ActivationCodeResult>(`/api/v1/admin/qr-codes/${qr.id}/activation-code`),
+  );
+  useEffect(() => {
+    if (!revealed) return;
+    const hide = () => setRevealed(null);
+    const timeout = setTimeout(
+      hide,
+      Math.max(0, new Date(revealed.expires_at).getTime() - Date.now()),
+    );
+    window.addEventListener('blur', hide);
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('blur', hide);
+    };
+  }, [revealed]);
+  async function toggle() {
+    if (revealed) setRevealed(null);
+    else {
+      const result = await action.run(undefined);
+      if (result) setRevealed(result.data);
+    }
+  }
+  const eligible = qr.status === 'UNACTIVATED' && qr.stock_status !== 'DAMAGED';
+  return (
+    <div className="space-y-2 border-t pt-5">
+      <p className="text-xs text-muted-foreground">Kode aktivasi</p>
+      {eligible ? (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <code className="font-mono text-sm">
+              {revealed?.activation_code || '•••• •••• •••• ••••'}
+            </code>
+            <div className="flex items-center gap-2">
+              {revealed && (
+                <CopyButton value={revealed.activation_code} label="Salin kode aktivasi" />
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label={revealed ? 'Sembunyikan kode aktivasi' : 'Lihat kode aktivasi'}
+                aria-pressed={Boolean(revealed)}
+                disabled={action.pending || action.cooldown > 0}
+                onClick={() => void toggle()}
+              >
+                {action.pending ? (
+                  <Loader2 className="animate-spin" />
+                ) : revealed ? (
+                  <EyeOff />
+                ) : (
+                  <Eye />
+                )}
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Salinan tersedia maksimal 24 jam setelah batch dibuat, sebelum ada unit yang diaktifkan
+            atau kode dirotasi. Simpan kode yang telah diunduh untuk aktivasi berikutnya.
+          </p>
+          <FormError error={action.error} cooldown={action.cooldown} />
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {qr.activated_at
+            ? 'Kode sudah digunakan saat aktivasi.'
+            : 'Kode tidak tersedia untuk unit yang sudah dinonaktifkan.'}
+        </p>
+      )}
+    </div>
   );
 }
 function Sales({ qr }: { qr: AdminQr }) {

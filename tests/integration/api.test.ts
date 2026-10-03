@@ -363,6 +363,77 @@ describe('admin, production and inventory', () => {
       ).error.code,
     ).toBe('STOCK_TRANSITION_INVALID');
   });
+  it('reveals activation codes only to allowed admins on demand without changing the QR', async () => {
+    const b = await batch();
+    const q = b.qr[0];
+    const path = `/api/v1/admin/qr-codes/${q.id}/activation-code`;
+    expect((await call('GET', path, undefined, { admin: null })).status).toBe(401);
+    expect((await call('GET', path, undefined, { admin: 'outside' })).status).toBe(403);
+    expect(
+      (await call('GET', `/api/v1/admin/qr-codes/${randomUUID()}/activation-code`)).status,
+    ).toBe(404);
+    const result = await call('GET', path);
+    expect(result.status).toBe(200);
+    expect(result.data).toMatchObject({ qr_id: q.id, activation_code: b.codes[0].activation_code });
+    const detail = await call('GET', `/api/v1/admin/qr-codes/${q.id}`);
+    expect(detail.data.version).toBe(1);
+    expect(JSON.stringify(detail.json)).not.toContain(b.codes[0].activation_code);
+    expect(JSON.stringify((await call('GET', `/api/v1/public/qr/${q.token}`)).json)).not.toContain(
+      b.codes[0].activation_code,
+    );
+    expect((await db.pool.query('SELECT count(*) FROM qr_review.audit_events')).rows[0].count).toBe(
+      '1',
+    );
+  });
+  it('never reveals expired, consumed, invalidated or mismatched activation codes', async () => {
+    const b = await batch(2);
+    const [q, sibling] = b.qr;
+    const path = `/api/v1/admin/qr-codes/${q.id}/activation-code`;
+    const unavailable = async () =>
+      expect((await call('GET', path)).error.code).toBe('ACTIVATION_CODE_UNAVAILABLE');
+    await db.pool.query(
+      "UPDATE qr_review.qr_batches SET activation_codes_expires_at=now()-interval '1 second' WHERE id=$1",
+      [b.batch.id],
+    );
+    await unavailable();
+    await db.pool.query(
+      "UPDATE qr_review.qr_batches SET activation_codes_expires_at=now()+interval '24 hours' WHERE id=$1",
+      [b.batch.id],
+    );
+    await db.pool.query('UPDATE qr_review.qr_codes SET activation_hash=$1 WHERE id=$2', [
+      hmac(db.config, 'activation', 'AAAAAAAAAAAAAAAA'),
+      q.id,
+    ]);
+    await unavailable();
+    await db.pool.query('UPDATE qr_review.qr_codes SET activation_hash=$1 WHERE id=$2', [
+      hmac(db.config, 'activation', b.codes.find((c) => c.token === q.token)!.activation_code),
+      q.id,
+    ]);
+    const siblingCode = b.codes.find((c) => c.token === sibling.token)!.activation_code;
+    expect(
+      (await call('POST', `/api/v1/public/qr/${sibling.token}/activate`, setup(siblingCode)))
+        .status,
+    ).toBe(201);
+    await unavailable();
+    expect(
+      (await call('GET', `/api/v1/admin/qr-codes/${sibling.id}/activation-code`)).error.code,
+    ).toBe('ACTIVATION_CODE_UNAVAILABLE');
+    const rotated = await batch();
+    const r = rotated.qr[0];
+    expect(
+      (
+        await call(
+          'POST',
+          `/api/v1/admin/qr-codes/${r.id}/activation-code/rotate`,
+          { reason: 'Lost card' },
+          { version: 1 },
+        )
+      ).status,
+    ).toBe(200);
+    expect((await call('GET', `/api/v1/admin/qr-codes/${r.id}/activation-code`)).error.code).toBe(
+      'ACTIVATION_CODE_UNAVAILABLE',
+    );
+  });
   it('records a new unit sale directly and keeps activation, audit and retry consistent', async () => {
     const b = await batch();
     const q = b.qr[0];

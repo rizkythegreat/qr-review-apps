@@ -103,6 +103,8 @@ export const errorMessages: Record<string, string> = {
   QR_RETIRED: 'Unit QR ini sudah tidak digunakan.',
   GRANT_INVALID_OR_EXPIRED:
     'Tautan tidak valid, sudah digunakan, atau kedaluwarsa. Minta tautan baru dari admin.',
+  ACTIVATION_CODE_UNAVAILABLE:
+    'Salinan kode tidak lagi tersedia. Gunakan kode yang telah diunduh atau rotasi kode melalui tab Dukungan untuk unit yang belum aktif.',
   ACTIVATION_EXPORT_UNAVAILABLE:
     'Kode batch tidak lagi tersedia. Rotasi kode pada unit yang belum aktif bila diperlukan.',
   EXPORT_EXPIRED:

@@ -2,7 +2,16 @@ import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { Config } from './config';
 import { ApiError, conflict, missing } from './errors';
-import { activationCode, encrypt, equal, hashPin, hmac, opaque, verifyPin } from './crypto';
+import {
+  activationCode,
+  decrypt,
+  encrypt,
+  equal,
+  hashPin,
+  hmac,
+  opaque,
+  verifyPin,
+} from './crypto';
 import {
   activationAllowed,
   adminView,
@@ -258,6 +267,38 @@ export class Domain {
       { status: target },
     );
     return { qr: q, result: { data: adminView(this.config, q), headers: etag(q) } };
+  }
+  async revealActivationCode(db: PoolClient, id: string) {
+    const q = await getQr(db, id, false, true);
+    const unavailable = () => {
+      throw new ApiError(
+        409,
+        'ACTIVATION_CODE_UNAVAILABLE',
+        'Salinan kode aktivasi tidak lagi tersedia. Gunakan kode yang telah diunduh atau rotasi kode untuk unit yang belum aktif.',
+      );
+    };
+    if (!activationAllowed(q) || !q.activation_hash) unavailable();
+    const batch = (
+      await db.query<Batch>('SELECT * FROM qr_review.qr_batches WHERE id=$1', [q.batch_id])
+    ).rows[0];
+    if (
+      !batch.snapshot_valid ||
+      !batch.activation_snapshot ||
+      batch.activation_codes_expires_at.getTime() <= Date.now()
+    )
+      unavailable();
+    const codes = decrypt<{ token: string; activation_code: string }[]>(
+      this.config,
+      batch.activation_snapshot!,
+      `batch:${batch.id}`,
+    );
+    const code = codes.find((entry) => entry.token === q.token)?.activation_code;
+    if (!code || !equal(hmac(this.config, 'activation', code), q.activation_hash!)) unavailable();
+    return {
+      result: {
+        data: { qr_id: q.id, activation_code: code, expires_at: batch.activation_codes_expires_at },
+      },
+    };
   }
   async rotate(db: PoolClient, id: string, reason: string, ifMatch: string | null, actor: Actor) {
     let q = await getQr(db, id, false, true);

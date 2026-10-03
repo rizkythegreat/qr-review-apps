@@ -1042,6 +1042,42 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AdminAction'
+  /api/v1/admin/qr-codes/{qr_id}/activation-code:
+    get:
+      operationId: getActivationCode
+      summary: Lihat salinan kode aktivasi unit
+      description: Hanya admin allowlist. Membaca salinan dari snapshot terenkripsi batch yang masih valid dan belum kedaluwarsa (24 jam). Kode harus sesuai hash unit yang belum aktif. Setelah aktivasi unit mana pun atau rotasi kode dalam batch, salinan tidak lagi tersedia. Tidak mengubah kode, versi, atau masa berlaku. Detail QR biasa dan API publik tidak mengembalikan kode.
+      tags:
+      - Inventory
+      security:
+      - AdminBearer: []
+      parameters:
+      - $ref: '#/components/parameters/QrId'
+      responses:
+        '200':
+          description: Salinan kode. Respons no-store.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivationCodeResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '409':
+          description: ACTIVATION_CODE_UNAVAILABLE; kode sudah digunakan, salinan kedaluwarsa/dihapus, atau kode telah dirotasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/Error429'
+        '503':
+          $ref: '#/components/responses/Error503'
   /api/v1/admin/qr-codes/{qr_id}/activation-code/rotate:
     post:
       operationId: rotateActivationCode
@@ -2302,6 +2338,28 @@ components:
       description: 'Harus persis origin deployment terkonfigurasi. Berlaku pada seluruh public POST dan owner mutasi;
         origin lain atau hilang: 403. CLI/Postman menyetelnya eksplisit.'
   schemas:
+    ActivationCodeResponse:
+      type: object
+      additionalProperties: false
+      required: [data, request_id]
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        data:
+          type: object
+          additionalProperties: false
+          required: [qr_id, activation_code, expires_at]
+          properties:
+            qr_id:
+              type: string
+              format: uuid
+            activation_code:
+              type: string
+              pattern: '^[A-Z2-7]{16}$'
+            expires_at:
+              type: string
+              format: date-time
     PublicToken:
       type: string
       pattern: ^[A-Za-z0-9_-]{22}$
@@ -2371,6 +2429,7 @@ components:
               - QR_ALREADY_ACTIVE
               - QR_TRANSITION_INVALID
               - STOCK_TRANSITION_INVALID
+              - ACTIVATION_CODE_UNAVAILABLE
               - ACTIVATION_EXPORT_UNAVAILABLE
               - EXPORT_NOT_READY
               - QR_RETIRED

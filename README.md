@@ -40,6 +40,7 @@ Setelah server dan worker berjalan, gunakan urutan berikut:
 1. Buka `/admin`, buat batch, lalu siapkan dan unduh ZIP QR publik serta ZIP kode aktivasi secara terpisah.
 2. Berikan QR dan kode aktivasi kepada pemilik toko; tidak perlu mencatat penjualan atau meloloskan QC secara manual.
 3. Pindai QR atau buka `/r/TOKEN`. Pemilik mengisi kode aktivasi, nama toko, link review Google dan PIN empat digit. Aktivasi berhasil otomatis mencatat penjualan dan mengubah stok menjadi `SOLD`.
+   Di informasi unit admin, kode tersensor secara bawaan dan tombol mata mengambil salinan saat diminta. Salinan mengikuti masa berlaku snapshot batch (24 jam, sebelum aktivasi/rotasi unit mana pun). Kode yang telah digunakan atau salinan yang dihapus tidak dapat dilihat ulang; gunakan unduhan sebelumnya atau rotasi melalui tab Dukungan.
 4. Pemilik membuka `/manage` menggunakan token dan PIN untuk memperbarui link, melihat kunjungan atau mengganti PIN.
 5. Admin menggunakan tab Dukungan di detail QR untuk reset PIN, transfer, rotasi kode, suspend/resume atau penonaktifan permanen. Bantuan penggunaan tersedia di `/help`.
 
