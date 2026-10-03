@@ -439,18 +439,18 @@ async function main() {
     await expect(admin.locator('tbody tr')).toHaveCount(1);
     mark('QR search and cursor pagination');
 
-    stage = 'direct sales';
+    stage = 'automatic sales';
     await owner.goto(`${origin}/r/${qr.token}`);
-    await expect(owner.getByText('QR belum siap diaktifkan', { exact: true })).toBeVisible();
+    await expect(owner.getByLabel(fieldLabel('Kode aktivasi'))).toBeVisible();
     await admin.goto(`${origin}/admin/qr-codes/${qr.id}`);
+    await expect(admin.getByRole('button', { name: 'Catat penjualan', exact: true })).toHaveCount(
+      0,
+    );
     await expect(
       admin.getByRole('button', { name: 'Lolos QC · siap dijual', exact: true }),
     ).toHaveCount(0);
-    await admin.getByRole('button', { name: 'Catat penjualan', exact: true }).click();
-    await admin.getByLabel(fieldLabel('Referensi penjualan')).fill('UI-SALE-001');
-    await admin.getByLabel(fieldLabel('Nama pembeli (opsional)')).fill('Kopi Bahagia');
-    await admin.getByRole('button', { name: 'Simpan penjualan', exact: true }).click();
-    await expect(admin.getByText('Penjualan tercatat', { exact: true })).toBeVisible();
+    await admin.getByRole('tab', { name: 'Penjualan', exact: true }).click();
+    await expect(admin.getByText('Menunggu aktivasi pemilik', { exact: true })).toBeVisible();
     await admin.getByRole('tab', { name: 'Ringkasan', exact: true }).click();
     const svgDownload = admin.waitForEvent('download');
     await admin.getByRole('button', { name: 'SVG', exact: true }).click();
@@ -458,9 +458,7 @@ async function main() {
       (await readFile((await (await svgDownload).path())!, 'utf8')).includes('<svg'),
     ).toBeTruthy();
     await screenshot(admin, 'qr-desktop');
-    mark(
-      'Activation blocked before sale, direct sale without manual QC, recorded sale and SVG download',
-    );
+    mark('Activation available immediately, automatic sale pending and SVG download');
 
     stage = 'activation';
     const response = await owner.goto(`${origin}/r/${qr.token}`);
@@ -494,6 +492,12 @@ async function main() {
     await screenshot(owner, 'activation-mobile');
     await owner.getByRole('button', { name: 'Aktifkan QR toko', exact: true }).click();
     await expect(owner.getByText('QR toko sudah aktif!', { exact: true })).toBeVisible();
+    await admin.reload();
+    await admin.getByRole('tab', { name: 'Penjualan', exact: true }).click();
+    await expect(admin.getByText('Penjualan tercatat', { exact: true })).toBeVisible();
+    await expect(admin.getByText(/^ACT-[0-9a-f-]{36}$/)).toBeVisible();
+    await screenshot(admin, 'qr-desktop');
+
     mark('Printed /r URL renders activation, link/PIN field validation, leading-zero PIN');
 
     stage = 'owner settings';

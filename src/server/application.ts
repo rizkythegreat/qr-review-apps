@@ -14,7 +14,15 @@ import {
   supabaseVerifier,
 } from './auth';
 import { transaction } from './db';
-import { adminView, batchView, exportView, ownerView, type Batch, type Qr } from './models';
+import {
+  activationAllowed,
+  adminView,
+  batchView,
+  exportView,
+  ownerView,
+  type Batch,
+  type Qr,
+} from './models';
 import { createExport, download, getBatch, inspectExport, qrImage } from './exports';
 import { decodeCursor, encodeCursor } from './pagination';
 import { type Result, type Idempotency } from './idempotency';
@@ -296,7 +304,7 @@ export class Application {
           data: {
             token: q.token,
             status: q.status,
-            activation_allowed: q.status === 'UNACTIVATED' && q.stock_status === 'SOLD',
+            activation_allowed: activationAllowed(q),
             manage_path: '/manage',
             supported_review_link_policy: 'GOOGLE_REVIEW_V1',
           },
@@ -568,7 +576,7 @@ export class Application {
         return fallback(200, 'Layanan sementara ditangguhkan. Hubungi dukungan.', requestId, head);
       const response = fallback(
         200,
-        row.stock_status === 'SOLD'
+        activationAllowed(row)
           ? 'QR belum aktif. Aktivasi tersedia menggunakan kode pada kartu rahasia.'
           : 'QR belum aktif dan belum tersedia untuk aktivasi.',
         requestId,

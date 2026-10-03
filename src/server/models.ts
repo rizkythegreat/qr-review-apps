@@ -19,6 +19,9 @@ export interface Qr {
   created_at: Date;
   updated_at: Date;
 }
+export function activationAllowed(q: Pick<Qr, 'status' | 'stock_status'>) {
+  return q.status === 'UNACTIVATED' && ['GENERATED', 'AVAILABLE', 'SOLD'].includes(q.stock_status);
+}
 export interface Batch {
   id: string;
   label: string;

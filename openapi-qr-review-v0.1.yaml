@@ -1405,7 +1405,7 @@ paths:
     get:
       operationId: getPublicQr
       summary: Metadata aman untuk flow aktivasi
-      description: Tidak mencatat kunjungan. activation_allowed true hanya UNACTIVATED + SOLD. Resource RETIRED
+      description: Tidak mencatat kunjungan. activation_allowed true hanya UNACTIVATED dengan stok GENERATED, AVAILABLE atau SOLD. Resource RETIRED
         tetap mengembalikan metadata 200 dengan false; resolver /r memakai 410. Tidak mengembalikan hash, URL tujuan,
         sale, kode atau statistik.
       tags:
@@ -1443,9 +1443,8 @@ paths:
     post:
       operationId: activateQr
       summary: Aktifkan unit toko
-      description: 'Memerlukan UNACTIVATED + SOLD dan kode benar. Kode salah: 401 INVALID_ACTIVATION_CODE. Stok
-        belum SOLD: 409 QR_NOT_SOLD; sudah aktif: 409 QR_ALREADY_ACTIVE; retired: 410 QR_RETIRED. Hash PIN, konsumsi
-        kode, simpan toko dan buat ownership_id pertama atomik. Tidak membuat cookie; pemilik login via /owner/sessions.
+      description: 'Memerlukan UNACTIVATED dengan stok GENERATED, AVAILABLE atau SOLD dan kode benar. Kode salah: 401 INVALID_ACTIVATION_CODE; sudah aktif: 409 QR_ALREADY_ACTIVE; retired: 410 QR_RETIRED. Hash PIN, konsumsi
+        kode, simpan toko dan buat ownership_id pertama atomik. Stok GENERATED/AVAILABLE otomatis menjadi SOLD dengan satu sale berreferensi ACT-UUID dan sold_at sama dengan activated_at; sale lama untuk SOLD dipertahankan. Tidak membuat cookie; pemilik login via /owner/sessions.
         Aktivasi paralel hanya satu sukses. Retry key+payload yang sama mereplay hasil committed bila ownership/state
         belum berubah; jika berubah 409 QR_STATE_CHANGED. Key baru setelah aktif bukan replay.'
       tags:
@@ -1972,7 +1971,7 @@ paths:
     get:
       operationId: resolveQr
       summary: Scan QR publik
-      description: 'ACTIVE: 302 sementara ke review_url. UNACTIVATED: 200 halaman belum aktif, form hanya jika SOLD.
+      description: 'ACTIVE: 302 sementara ke review_url. UNACTIVATED: 200 halaman belum aktif, form tersedia untuk stok GENERATED, AVAILABLE atau SOLD.
         SUSPENDED: 200 fallback tanpa tujuan Google. RETIRED: 410 fallback. Tidak dikenal: 404. DB gagal: 503 coba
         lagi, tidak membuka aktivasi. HEAD mempunyai status/header yang sama tanpa body dan tidak dicatat. Preview
         tujuan gunakan URL dari halaman kelola langsung, bukan resolver. Semua response no-store, max-age=0; analytics
@@ -2102,7 +2101,7 @@ paths:
     head:
       operationId: headQr
       summary: Periksa QR tanpa hitungan
-      description: 'ACTIVE: 302 sementara ke review_url. UNACTIVATED: 200 halaman belum aktif, form hanya jika SOLD.
+      description: 'ACTIVE: 302 sementara ke review_url. UNACTIVATED: 200 halaman belum aktif, form tersedia untuk stok GENERATED, AVAILABLE atau SOLD.
         SUSPENDED: 200 fallback tanpa tujuan Google. RETIRED: 410 fallback. Tidak dikenal: 404. DB gagal: 503 coba
         lagi, tidak membuka aktivasi. HEAD mempunyai status/header yang sama tanpa body dan tidak dicatat. Preview
         tujuan gunakan URL dari halaman kelola langsung, bukan resolver. Semua response no-store, max-age=0; analytics

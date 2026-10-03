@@ -3,7 +3,15 @@ import type { Pool, PoolClient } from 'pg';
 import type { Config } from './config';
 import { ApiError, conflict, missing } from './errors';
 import { activationCode, encrypt, equal, hashPin, hmac, opaque, verifyPin } from './crypto';
-import { adminView, batchView, ownerView, type Qr, type Grant, type Batch } from './models';
+import {
+  activationAllowed,
+  adminView,
+  batchView,
+  ownerView,
+  type Qr,
+  type Grant,
+  type Batch,
+} from './models';
 import { type Idempotency, idempotent, type Result } from './idempotency';
 import { type CredentialScope, Limiter } from './rate-limit';
 import {
@@ -339,7 +347,7 @@ export class Domain {
     if (q.status === 'RETIRED') throw new ApiError(410, 'QR_RETIRED', 'Unit tidak lagi digunakan.');
     if (q.status === 'ACTIVE') conflict('QR_ALREADY_ACTIVE');
     if (q.status !== 'UNACTIVATED') conflict('QR_TRANSITION_INVALID');
-    if (q.stock_status !== 'SOLD') conflict('QR_NOT_SOLD');
+    if (!activationAllowed(q)) conflict('STOCK_TRANSITION_INVALID');
     if (
       !q.activation_hash ||
       !equal(hmac(this.config, 'activation', b.activation_code), q.activation_hash)
@@ -353,10 +361,23 @@ export class Domain {
         [ownership, q.id],
       )
     ).rows[0];
+    const actor: Actor = { type: 'OWNER', id: ownership };
+    let sale: { id: string; reference: string } | undefined;
+    if (q.stock_status !== 'SOLD') {
+      const id = randomUUID();
+      const reference = `ACT-${id}`;
+      sale = (
+        await db.query(
+          'INSERT INTO qr_review.sales_records(id,qr_id,reference,sold_at) VALUES($1,$2,$3,$4) RETURNING id,reference',
+          [id, q.id, reference, period.started_at],
+        )
+      ).rows[0];
+    }
     q = await mutate(
       db,
       q,
       {
+        stock_status: 'SOLD',
         status: 'ACTIVE',
         store_name: b.store_name,
         review_url: b.review_url,
@@ -366,7 +387,7 @@ export class Domain {
         activated_at: period.started_at,
         auth_generation: q.auth_generation + 1,
       },
-      { type: 'OWNER', id: ownership },
+      actor,
       'ACTIVATED',
       undefined,
       {
@@ -376,6 +397,12 @@ export class Domain {
         ownership_id: ownership,
       },
     );
+    if (sale)
+      await audit(db, q, actor, 'SALE_RECORDED', {
+        stock_status: 'SOLD',
+        sale_id: sale.id,
+        reference: sale.reference,
+      });
     await invalidateSnapshot(db, q);
     return {
       qr: q,

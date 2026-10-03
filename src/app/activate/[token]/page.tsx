@@ -3,6 +3,7 @@ import { PublicShell } from '@/components/public-shell';
 import { getApplication } from '@/server/runtime';
 import { getQr } from '@/server/domain';
 import type { PublicQr } from '@/lib/types';
+import { activationAllowed } from '@/server/models';
 export default async function ActivationPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   let initial: PublicQr | undefined;
@@ -12,7 +13,7 @@ export default async function ActivationPage({ params }: { params: Promise<{ tok
       initial = {
         token,
         status: qr.status,
-        activation_allowed: qr.status === 'UNACTIVATED' && qr.stock_status === 'SOLD',
+        activation_allowed: activationAllowed(qr),
         manage_path: '/manage',
         supported_review_link_policy: 'GOOGLE_REVIEW_V1',
       };

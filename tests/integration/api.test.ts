@@ -367,7 +367,7 @@ describe('admin, production and inventory', () => {
     const b = await batch();
     const q = b.qr[0];
     const path = `/api/v1/admin/qr-codes/${q.id}`;
-    expect((await call('GET', `/api/v1/public/qr/${q.token}`)).data.activation_allowed).toBe(false);
+    expect((await call('GET', `/api/v1/public/qr/${q.token}`)).data.activation_allowed).toBe(true);
     const body = { reference: 'DIRECT-SALE', sold_at: new Date(Date.now() - 1000).toISOString() };
     const key = randomUUID();
     const result = await call('POST', path + '/sales', body, { version: 1, key });
@@ -388,6 +388,10 @@ describe('admin, production and inventory', () => {
     );
     expect(activated.status).toBe(201);
     expect((await call('GET', path)).data.status).toBe('ACTIVE');
+    expect((await call('GET', path + '/sales')).data.id).toBe(result.data.id);
+    expect(
+      (await db.pool.query('SELECT count(*) FROM qr_review.sales_records')).rows[0].count,
+    ).toBe('1');
   });
 
   it('serializes concurrent direct sales and rejects damaged or retired unsold units', async () => {
@@ -790,18 +794,9 @@ describe('activation, owner sessions and resolver', () => {
       log.mockRestore();
     }
   });
-  it('rejects unsold activation and wrong codes without consuming credentials', async () => {
+  it('rejects wrong codes without recording a sale or consuming credentials', async () => {
     const generated = await batch();
-    expect(
-      (
-        await call(
-          'POST',
-          `/api/v1/public/qr/${generated.qr[0].token}/activate`,
-          setup(generated.codes[0].activation_code),
-        )
-      ).error.code,
-    ).toBe('QR_NOT_SOLD');
-    const b = await sold();
+    const b = { q: generated.qr[0], code: generated.codes[0].activation_code };
     const key = randomUUID();
     const wrong = await call(
       'POST',
@@ -810,6 +805,9 @@ describe('activation, owner sessions and resolver', () => {
       { key },
     );
     expect(wrong.error.code).toBe('INVALID_ACTIVATION_CODE');
+    expect(
+      (await db.pool.query('SELECT count(*) FROM qr_review.sales_records')).rows[0].count,
+    ).toBe('0');
     expect(
       (
         await db.pool.query('SELECT status,activation_hash FROM qr_review.qr_codes WHERE id=$1', [
@@ -826,8 +824,9 @@ describe('activation, owner sessions and resolver', () => {
     ).toBe(201);
   });
   it('allows exactly one concurrent activation and replays the winner without cookies', async () => {
-    const b = await sold(),
-      path = `/api/v1/public/qr/${b.q.token}/activate`,
+    const generated = await batch();
+    const b = { q: generated.qr[0], code: generated.codes[0].activation_code };
+    const path = `/api/v1/public/qr/${b.q.token}/activate`,
       a = setup(b.code);
     const keys = [randomUUID(), randomUUID()],
       inputs = [a, { ...a, store_name: 'Contender' }];
@@ -851,6 +850,22 @@ describe('activation, owner sessions and resolver', () => {
       expect(replay.status).toBe(201);
       expect(replay.data).toEqual(r[winner].data);
       expect(replay.response.headers.get('set-cookie')).toBeNull();
+      const sale = (await call('GET', `/api/v1/admin/qr-codes/${b.q.id}/sales`)).data;
+      expect(sale.reference).toMatch(/^ACT-[0-9a-f-]{36}$/);
+      expect(new Date(sale.sold_at).toISOString()).toBe(
+        new Date(committed.activated_at).toISOString(),
+      );
+      expect(sale.buyer_name).toBeNull();
+      expect(committed.stock_status).toBe('SOLD');
+      expect(
+        (await db.pool.query('SELECT count(*) FROM qr_review.sales_records')).rows[0].count,
+      ).toBe('1');
+      const audit = (await call('GET', `/api/v1/admin/qr-codes/${b.q.id}/audit-events`)).data;
+      expect(audit.filter((e: any) => e.action === 'SALE_RECORDED')).toHaveLength(1);
+      expect(audit.filter((e: any) => e.action === 'ACTIVATED')).toHaveLength(1);
+      const dashboard = (await call('GET', '/api/v1/admin/dashboard')).data;
+      expect(dashboard.stock_counts.SOLD).toBe(1);
+
       await call(
         'POST',
         `/api/v1/admin/qr-codes/${b.q.id}/suspend`,
@@ -862,15 +877,53 @@ describe('activation, owner sessions and resolver', () => {
       );
     }
   });
+  it('automatically sells AVAILABLE units and rejects damaged and retired units', async () => {
+    const b = await batch(3);
+    const [available, damaged, retired] = b.qr;
+    await call(
+      'PATCH',
+      `/api/v1/admin/qr-codes/${available.id}/stock`,
+      { stock_status: 'AVAILABLE', reason: 'Legacy stock' },
+      { version: 1 },
+    );
+    await call(
+      'PATCH',
+      `/api/v1/admin/qr-codes/${damaged.id}/stock`,
+      { stock_status: 'DAMAGED', reason: 'Broken' },
+      { version: 1 },
+    );
+    await call(
+      'POST',
+      `/api/v1/admin/qr-codes/${retired.id}/retire`,
+      { reason: 'Withdrawn' },
+      { version: 1 },
+    );
+    for (const q of [damaged, retired]) {
+      expect((await call('GET', `/api/v1/public/qr/${q.token}`)).data.activation_allowed).toBe(
+        false,
+      );
+      const code = b.codes.find((c) => c.token === q.token)!.activation_code;
+      expect(
+        (await call('POST', `/api/v1/public/qr/${q.token}/activate`, setup(code))).error.code,
+      ).toBe('QR_RETIRED');
+    }
+    const code = b.codes.find((c) => c.token === available.token)!.activation_code;
+    expect(
+      (await call('POST', `/api/v1/public/qr/${available.token}/activate`, setup(code))).status,
+    ).toBe(201);
+    expect(
+      (await db.pool.query('SELECT count(*) FROM qr_review.sales_records')).rows[0].count,
+    ).toBe('1');
+  });
   it('returns privacy-safe metadata and correct fallback/HEAD status', async () => {
     const g = await batch();
     const metadata = await call('GET', `/api/v1/public/qr/${g.qr[0].token}`);
-    expect(metadata.data.activation_allowed).toBe(false);
+    expect(metadata.data.activation_allowed).toBe(true);
     expect(metadata.data.review_url).toBeUndefined();
     expect(metadata.data.stock_status).toBeUndefined();
     const html = await resolve(g.qr[0].token);
     expect(html.status).toBe(200);
-    expect(await html.text()).toContain('belum tersedia');
+    expect(await html.text()).toContain('Aktivasi tersedia');
     const b = await sold();
     expect((await call('GET', `/api/v1/public/qr/${b.q.token}`)).data.activation_allowed).toBe(
       true,

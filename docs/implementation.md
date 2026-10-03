@@ -2,22 +2,22 @@
 
 Scope saat ini mencakup backend Next.js, database PostgreSQL untuk Supabase dan UI shadcn/ui + Tailwind. [Pemetaan UI dan pengujiannya](ui-implementation.md) melengkapi bukti backend di bawah. Uji cetak fisik, setup toko pilot dan restore pada paket hosting produksi tetap dilakukan pada environment tersebut.
 
-| Requirement          | Implementasi                                                                 | Bukti                                                                               |
-| -------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| FR01 Admin/batch     | Auth server Supabase + allowlist, batch atomik 1–500                         | Tes admin, 100 token unik, batch 500, replay dan rollback                           |
-| FR02 Ekspor produksi | Worker PostgreSQL, ZIP publik manifest/PNG/SVG dan ZIP kode terpisah         | Decode PNG ke origin/token, periksa isi ZIP, invalidasi dan TTL                     |
-| FR03 Stok/penjualan  | State terpisah, QC, sale unik per unit, `sold_at` tidak di masa depan        | Transaksi sale/replay, If-Match, DAMAGED → RETIRED terminal                         |
-| FR04 Aktivasi        | SOLD + UNACTIVATED + hash kode; PIN scrypt+salt+pepper; kode dikonsumsi      | Aktivasi salah ditolak dan dua aktivasi hanya satu menang                           |
-| FR05 Scan publik     | GET/HEAD status HTML atau 302, no-store, DB error 503                        | Status unknown/unactivated/suspend/retire, perubahan URL dan gangguan pencatatan    |
-| FR06 Pemilik         | Cookie satu QR/ownership/generation, CSRF, edit, PIN change, logout          | Isolasi QR, expiry 30 menit, readonly saat suspend, pencabutan sesi                 |
-| FR07 Statistik       | Event dan agregat ditulis atomik; periode hasil resolve digunakan            | HEAD/bot/traffic uji dikecualikan, transfer mulai nol, old-period event tetap benar |
-| FR08 Dukungan        | Grant sekali pakai 15 menit, rotasi kode, reset/transfer/status dengan audit | Replay/tombstone, expired/revoked/wrong-kind grant, sesi lama dicabut               |
+| Requirement          | Implementasi                                                                                 | Bukti                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| FR01 Admin/batch     | Auth server Supabase + allowlist, batch atomik 1–500                                         | Tes admin, 100 token unik, batch 500, replay dan rollback                           |
+| FR02 Ekspor produksi | Worker PostgreSQL, ZIP publik manifest/PNG/SVG dan ZIP kode terpisah                         | Decode PNG ke origin/token, periksa isi ZIP, invalidasi dan TTL                     |
+| FR03 Stok/penjualan  | State terpisah, sale otomatis saat aktivasi dan unik per unit, `sold_at` tidak di masa depan | Transaksi sale/replay, If-Match, DAMAGED → RETIRED terminal                         |
+| FR04 Aktivasi        | GENERATED/AVAILABLE/SOLD + UNACTIVATED + hash kode; PIN scrypt+salt+pepper; kode dikonsumsi  | Aktivasi salah ditolak dan dua aktivasi hanya satu menang                           |
+| FR05 Scan publik     | GET/HEAD status HTML atau 302, no-store, DB error 503                                        | Status unknown/unactivated/suspend/retire, perubahan URL dan gangguan pencatatan    |
+| FR06 Pemilik         | Cookie satu QR/ownership/generation, CSRF, edit, PIN change, logout                          | Isolasi QR, expiry 30 menit, readonly saat suspend, pencabutan sesi                 |
+| FR07 Statistik       | Event dan agregat ditulis atomik; periode hasil resolve digunakan                            | HEAD/bot/traffic uji dikecualikan, transfer mulai nol, old-period event tetap benar |
+| FR08 Dukungan        | Grant sekali pakai 15 menit, rotasi kode, reset/transfer/status dengan audit                 | Replay/tombstone, expired/revoked/wrong-kind grant, sesi lama dicabut               |
 
 | AC   | Bukti teknis backend                                                                                                                     |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | AC01 | Batch 100/500, token unik, retry identik tidak membuat batch baru, in-progress diberi Retry-After                                        |
 | AC02 | Decoder membaca PNG dari ZIP, manifest sesuai URL/token, secret ZIP terpisah dan ciphertext at rest                                      |
-| AC03 | Kode salah/belum SOLD ditolak, hash dan konfigurasi tetap utuh                                                                           |
+| AC03 | Kode salah/unit terminal ditolak; kode salah tidak membuat sale, hash dan konfigurasi tetap utuh                                         |
 | AC04 | Aktivasi bersamaan menghasilkan satu commit, satu ownership, data pemenang dan replay utuh                                               |
 | AC05 | 302 no-store ke URL terbaru setelah edit tanpa perubahan token                                                                           |
 | AC06 | Lima kegagalan persisten + cooldown lintas instance, cookie/CSRF terisolasi satu QR                                                      |

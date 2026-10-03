@@ -88,7 +88,7 @@ export function Activation({ token, initial }: { token: string; initial?: Public
     return (
       <PublicStatus
         title="QR belum siap diaktifkan"
-        description="QR belum aktif dan belum tercatat terjual. Hubungi penjual untuk menyelesaikan pencatatan unit sebelum aktivasi."
+        description="Unit ini belum tersedia untuk aktivasi. Hubungi penjual untuk mendapatkan bantuan."
       />
     );
   return (

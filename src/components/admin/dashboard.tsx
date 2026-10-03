@@ -42,7 +42,9 @@ export function AdminDashboard() {
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="text-base">Status layanan QR</CardTitle>
-                <CardDescription>Aktivasi dilakukan setelah unit tercatat terjual.</CardDescription>
+                <CardDescription>
+                  Penjualan tercatat otomatis saat pemilik mengaktifkan QR.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div
@@ -85,15 +87,15 @@ export function AdminDashboard() {
             <Card className="bg-muted/35">
               <CardHeader>
                 <Clock className="mb-2 size-5 text-muted-foreground" />
-                <CardTitle className="text-base">Catat penjualan unit baru</CardTitle>
+                <CardTitle className="text-base">Siap dibawa ke toko</CardTitle>
                 <CardDescription>
                   {number(data.stock_counts.GENERATED)} unit baru tersedia di stok.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="mb-5 text-sm leading-relaxed text-muted-foreground">
-                  Catat penjualan ketika unit diberikan kepada toko agar pemilik dapat mengaktifkan
-                  QR.
+                  Berikan QR dan kode aktivasi kepada pemilik toko. Penjualan tercatat otomatis
+                  setelah QR berhasil diaktifkan.
                 </p>
                 <Button asChild variant="outline" className="w-full justify-between">
                   <Link href="/admin/qr-codes?stock_status=GENERATED">

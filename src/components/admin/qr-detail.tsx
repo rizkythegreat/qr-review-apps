@@ -11,7 +11,6 @@ import {
   Download,
   ExternalLink,
   Loader2,
-  ShoppingBag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +30,6 @@ import {
   CopyButton,
   ErrorState,
   FormError,
-  InputField,
   Loading,
   PageHeading,
   StatusBadge,
@@ -148,21 +146,18 @@ export function QrDetail({ id, initialTab = 'overview' }: { id: string; initialT
               <CardHeader>
                 <CardTitle className="text-base">Stok dan penjualan</CardTitle>
                 <CardDescription>
-                  Catat penjualan untuk mengizinkan pemilik mengaktifkan QR.
+                  Pemilik dapat langsung mengaktifkan QR. Penjualan tercatat otomatis setelah
+                  aktivasi.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-3">
-                <Button onClick={() => setTab('sales')}>
-                  <ShoppingBag />
-                  Catat penjualan
-                </Button>
                 <DamageAction qr={qr} etag={etag} />
               </CardContent>
             </Card>
           )}
         </TabsContent>
         <TabsContent value="sales">
-          <Sales qr={qr} etag={etag} />
+          <Sales qr={qr} />
         </TabsContent>
         <TabsContent value="audit">
           <AuditLog qrId={qr.id} />
@@ -319,99 +314,22 @@ function DamageAction({ qr, etag }: { qr: AdminQr; etag: string | null }) {
     </Dialog>
   );
 }
-function Sales({ qr, etag }: { qr: AdminQr; etag: string | null }) {
+function Sales({ qr }: { qr: AdminQr }) {
   if (qr.stock_status === 'SOLD') return <SaleInformation qrId={qr.id} />;
-  if (!['GENERATED', 'AVAILABLE'].includes(qr.stock_status) || qr.status !== 'UNACTIVATED')
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Penjualan belum tersedia</CardTitle>
-          <CardDescription>
-            Penjualan hanya dapat dicatat untuk unit baru atau siap dijual yang belum diaktifkan.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  return <SaleForm qr={qr} etag={etag} />;
-}
-function SaleForm({ qr, etag }: { qr: AdminQr; etag: string | null }) {
-  const api = useAdminApi();
-  const queries = useQueryClient();
-  const [when] = useState(() => {
-    const now = new Date();
-    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-  });
-  const action = useAction(
-    (
-      body: { reference: string; sold_at: string; buyer_name?: string; support_contact?: string },
-      key,
-    ) => api<Sale>(`/api/v1/admin/qr-codes/${qr.id}/sales`, { method: 'POST', body, etag, key }),
-  );
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const buyer_name = String(form.get('buyer_name')).trim();
-    const support_contact = String(form.get('support_contact')).trim();
-    const result = await action.run({
-      reference: String(form.get('reference')).trim(),
-      sold_at: new Date(String(form.get('sold_at'))).toISOString(),
-      ...(buyer_name ? { buyer_name } : {}),
-      ...(support_contact ? { support_contact } : {}),
-    });
-    if (result) {
-      toast.success('Penjualan tercatat. Pemilik dapat mengaktifkan QR.');
-      void queries.invalidateQueries({ queryKey: ['admin'] });
-    }
-  }
+  const pending =
+    qr.status === 'UNACTIVATED' && ['GENERATED', 'AVAILABLE'].includes(qr.stock_status);
   return (
-    <Card className="max-w-3xl">
+    <Card>
       <CardHeader>
-        <ShoppingBag className="mb-2 size-6 text-muted-foreground" />
-        <CardTitle>Catat penjualan</CardTitle>
+        <CardTitle className="text-base">
+          {pending ? 'Menunggu aktivasi pemilik' : 'Tidak ada penjualan'}
+        </CardTitle>
         <CardDescription>
-          Setelah tercatat terjual, pemilik dapat mengaktifkan QR menggunakan kode pada kartu.
+          {pending
+            ? 'Penjualan dan referensinya tercatat otomatis ketika pemilik berhasil mengaktifkan QR. Waktu penjualan mengikuti waktu aktivasi.'
+            : 'Unit ini tidak memiliki catatan penjualan.'}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={submit} className="space-y-5">
-          <div className="grid gap-5 sm:grid-cols-2">
-            <InputField
-              label="Referensi penjualan"
-              name="reference"
-              placeholder="SALE-20261002-001"
-              maxLength={100}
-              required
-              error={action.error}
-            />
-            <InputField
-              label="Waktu penjualan"
-              name="sold_at"
-              type="datetime-local"
-              defaultValue={when}
-              required
-              error={action.error}
-            />
-            <InputField
-              label="Nama pembeli (opsional)"
-              name="buyer_name"
-              maxLength={120}
-              placeholder="Nama pada nota penjualan"
-              error={action.error}
-            />
-            <InputField
-              label="Kontak dukungan (opsional)"
-              name="support_contact"
-              maxLength={120}
-              placeholder="Kontak untuk referensi dukungan"
-              error={action.error}
-            />
-          </div>
-          <FormError error={action.error} cooldown={action.cooldown} />
-          <SubmitButton pending={action.pending} cooldown={action.cooldown}>
-            Simpan penjualan
-          </SubmitButton>
-        </form>
-      </CardContent>
     </Card>
   );
 }

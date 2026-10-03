@@ -43,7 +43,10 @@ export default async function HelpPage({
           </CardHeader>
           <CardContent>
             <ol className="list-decimal space-y-3 pl-5 text-sm leading-relaxed text-muted-foreground">
-              <li>Pastikan penjual sudah mencatat unit sebagai terjual.</li>
+              <li>
+                Siapkan QR dan kode aktivasi yang diberikan penjual. Penjualan tercatat otomatis
+                setelah aktivasi berhasil.
+              </li>
               <li>Pindai QR pada unit. Halaman aktivasi akan terbuka.</li>
               <li>Isi kode dari kartu rahasia, nama toko, dan link review Google.</li>
               <li>Buka tombol uji tujuan untuk memastikan bisnisnya benar.</li>
