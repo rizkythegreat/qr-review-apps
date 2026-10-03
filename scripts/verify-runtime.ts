@@ -273,7 +273,14 @@ async function main() {
         size_px: 256,
       })
     ).value.data;
-    await cli('worker', ['--once']);
+    // Verify that Next's after() processes the job without a standalone worker.
+    for (let i = 0; i < 100; i++) {
+      const job = (await json('GET', `/api/v1/admin/exports/${exported.id}`)).value.data;
+      if (job.status === 'READY') break;
+      if (job.status === 'FAILED' || job.status === 'EXPIRED' || i === 99)
+        throw new Error('Background export did not become ready');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     const archive = await request(origin, `/api/v1/admin/exports/${exported.id}/download`, {
       headers,
     });
@@ -288,12 +295,12 @@ async function main() {
       resolver: 302,
       durable_visits: stats.total_visits,
       public_zip: 200,
+      export_background: 'passed without standalone worker',
     };
     await cli('maintenance');
     report.cli = {
       migrations: 'passed',
       admin_allowlist: 'passed',
-      export_worker: 'passed',
       maintenance: 'passed',
     };
     if (process.argv.includes('--load')) {

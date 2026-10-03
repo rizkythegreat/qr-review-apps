@@ -269,7 +269,11 @@ function ExportItem({ id, batchId }: { id: string; batchId: string }) {
       {job?.status === 'FAILED' && (
         <Alert variant="destructive">
           <AlertDescription>
-            Ekspor gagal disiapkan. Periksa ketersediaan kode, lalu buat ekspor baru.
+            {job.failure_code === 'EXPORT_TOO_LARGE'
+              ? 'Arsip terlalu besar untuk diunduh. Gunakan SVG atau batch yang lebih kecil.'
+              : job.failure_code === 'EXPORT_TIME_LIMIT'
+                ? 'Ekspor terlalu lama diproses. Gunakan SVG atau batch yang lebih kecil.'
+                : 'Ekspor gagal disiapkan. Periksa ketersediaan kode, lalu buat ekspor baru.'}
           </AlertDescription>
         </Alert>
       )}

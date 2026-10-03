@@ -113,12 +113,34 @@ export function download(config: Config, job: ExportJob) {
     },
   };
 }
-export async function processOneExport(pool: Pool, config: Config) {
+export interface ExportProcessingOptions {
+  jobId?: string;
+  maxDurationMs?: number;
+  maxArtifactBytes?: number;
+}
+class ExportLimitError extends Error {
+  constructor(readonly code: 'EXPORT_TIME_LIMIT' | 'EXPORT_TOO_LARGE') {
+    super(code);
+  }
+}
+export async function processOneExport(
+  pool: Pool,
+  config: Config,
+  options: ExportProcessingOptions = {},
+) {
+  const deadline = Date.now() + (options.maxDurationMs ?? Infinity);
+  function checkTime() {
+    if (Date.now() >= deadline) throw new ExportLimitError('EXPORT_TIME_LIMIT');
+  }
   const job = await transaction(pool, async (db) => {
     const row = (
-      await db.query<ExportJob>(`SELECT * FROM qr_review.export_jobs WHERE
-      status='QUEUED' OR (status='RUNNING' AND started_at<now()-interval '5 minutes')
-      ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1`)
+      await db.query<ExportJob>(
+        `SELECT * FROM qr_review.export_jobs WHERE
+      ($1::uuid IS NULL OR id=$1) AND
+      (status='QUEUED' OR (status='RUNNING' AND started_at<now()-interval '5 minutes'))
+      ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1`,
+        [options.jobId ?? null],
+      )
     ).rows[0];
     if (!row) return undefined;
     return (
@@ -130,6 +152,7 @@ export async function processOneExport(pool: Pool, config: Config) {
   });
   if (!job) return false;
   try {
+    checkTime();
     const batch = await getBatch(pool, job.batch_id);
     if (
       job.expires_at.getTime() <= Date.now() ||
@@ -172,17 +195,23 @@ export async function processOneExport(pool: Pool, config: Config) {
           '\r\n',
       );
       // Sequential generation bounds memory/CPU; durable jobs can survive application restarts.
-      for (const q of units)
+      for (const q of units) {
+        checkTime();
         zip.file(
           `qr/${q.token}.${job.image_format}`,
           await qrImage(config.PUBLIC_ORIGIN, q.token, job.image_format, job.size_px),
         );
+      }
     }
+    checkTime();
     const bytes = await zip.generateAsync({
       type: 'nodebuffer',
       compression: 'DEFLATE',
       compressionOptions: { level: 3 },
     });
+    checkTime();
+    if (options.maxArtifactBytes !== undefined && bytes.length > options.maxArtifactBytes)
+      throw new ExportLimitError('EXPORT_TOO_LARGE');
     await transaction(pool, async (db) => {
       const current = await inspectExport(db, job.id);
       if (current.status !== 'RUNNING' || current.lease_id !== job.lease_id) return;
@@ -195,11 +224,15 @@ export async function processOneExport(pool: Pool, config: Config) {
         [job.id, artifact],
       );
     });
-  } catch {
+  } catch (error) {
     logFailure('export_failed');
     await pool.query(
-      "UPDATE qr_review.export_jobs SET status='FAILED',failure_code='EXPORT_GENERATION_FAILED',artifact=NULL WHERE id=$1 AND lease_id=$2 AND status='RUNNING'",
-      [job.id, job.lease_id],
+      "UPDATE qr_review.export_jobs SET status='FAILED',failure_code=$3,artifact=NULL WHERE id=$1 AND lease_id=$2 AND status='RUNNING'",
+      [
+        job.id,
+        job.lease_id,
+        error instanceof ExportLimitError ? error.code : 'EXPORT_GENERATION_FAILED',
+      ],
     );
   }
   return true;

@@ -70,7 +70,7 @@ export class Application {
   get config() {
     return this.options.config;
   }
-  async handle(request: Request): Promise<Response> {
+  async handle(request: Request, scheduleExport?: (id: string) => void): Promise<Response> {
     const requestId = randomUUID();
     try {
       const url = new URL(request.url);
@@ -120,6 +120,17 @@ export class Application {
         match.path,
         key,
       );
+      if (scheduleExport && (op === 'createExport' || op === 'getExport')) {
+        const job = result.data as ReturnType<typeof exportView>;
+        if (job.status === 'QUEUED' || job.status === 'RUNNING') {
+          try {
+            scheduleExport(job.id);
+          } catch (error) {
+            // The job is already committed. Status polling can retry scheduling it.
+            logFailure('export_scheduling_failed', requestId, undefined, error);
+          }
+        }
+      }
       return respond(result, requestId);
     } catch (error) {
       if (error instanceof ApiError) return errorResponse(error, requestId);

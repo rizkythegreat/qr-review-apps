@@ -24,9 +24,9 @@ export function getApplication() {
   }
   return application;
 }
-export async function handleApi(request: Request) {
+export async function handleApi(request: Request, scheduleExport?: (id: string) => void) {
   try {
-    return await getApplication().handle(request);
+    return await getApplication().handle(request, scheduleExport);
   } catch (error) {
     const id = randomUUID();
     logFailure(

@@ -1,5 +1,5 @@
 {
-  "verified_at": "2026-10-02T13:44:43.717Z",
+  "verified_at": "2026-10-03T00:48:10.595Z",
   "runtime": "Next.js production build, local PostgreSQL, temporary HTTPS proxy, simulated Supabase Auth with JWT signature verification",
   "smoke": {
     "batch": 201,
@@ -9,12 +9,12 @@
     "owner_update": 200,
     "resolver": 302,
     "durable_visits": 1,
-    "public_zip": 200
+    "public_zip": 200,
+    "export_background": "passed without standalone worker"
   },
   "cli": {
     "migrations": "passed",
     "admin_allowlist": "passed",
-    "export_worker": "passed",
     "maintenance": "passed"
   },
   "client_bundle_secrets": "none"

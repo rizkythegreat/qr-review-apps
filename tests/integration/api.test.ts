@@ -44,6 +44,7 @@ async function call(
     raw?: string;
     headers?: Record<string, string>;
     app?: Application;
+    scheduleExport?: (id: string) => void;
   } = {},
 ): Promise<Reply> {
   const headers: Record<string, string> = {
@@ -64,7 +65,7 @@ async function call(
     headers,
     body: options.raw ?? (body === undefined ? undefined : JSON.stringify(body)),
   });
-  const response = await (options.app || db.app).handle(request);
+  const response = await (options.app || db.app).handle(request, options.scheduleExport);
   const json = response.headers.get('content-type')?.includes('application/json')
     ? await response.clone().json()
     : undefined;
@@ -418,6 +419,92 @@ describe('admin, production and inventory', () => {
     );
     expect((await call('GET', '/api/v1/admin/batches')).data).toHaveLength(1);
   });
+  it('schedules committed export jobs and status polling, and only processes the requested job once', async () => {
+    const b = await batch(2);
+    const path = `/api/v1/admin/batches/${b.batch.id}/exports`;
+    const first = await call('POST', path, { kind: 'PUBLIC_QR', size_px: 256 });
+    const schedule = vi.fn();
+    const second = await call(
+      'POST',
+      path,
+      { kind: 'ACTIVATION_CODES' },
+      { scheduleExport: schedule },
+    );
+    expect(second.status).toBe(202);
+    expect(schedule).toHaveBeenCalledWith(second.data.id);
+    expect(
+      (
+        await db.pool.query('select status from qr_review.export_jobs where id=$1', [
+          second.data.id,
+        ])
+      ).rows[0].status,
+    ).toBe('QUEUED');
+    schedule.mockClear();
+    await call('GET', `/api/v1/admin/exports/${second.data.id}`, undefined, {
+      scheduleExport: schedule,
+    });
+    expect(schedule).toHaveBeenCalledWith(second.data.id);
+    const processed = await Promise.all([
+      processOneExport(db.pool, db.config, { jobId: second.data.id }),
+      processOneExport(db.pool, db.config, { jobId: second.data.id }),
+    ]);
+    expect(processed.sort()).toEqual([false, true]);
+    expect((await call('GET', `/api/v1/admin/exports/${first.data.id}`)).data.status).toBe(
+      'QUEUED',
+    );
+    schedule.mockClear();
+    expect(
+      (
+        await call('GET', `/api/v1/admin/exports/${second.data.id}`, undefined, {
+          scheduleExport: schedule,
+        })
+      ).data.status,
+    ).toBe('READY');
+    expect(schedule).not.toHaveBeenCalled();
+    await call('GET', `/api/v1/admin/exports/${first.data.id}`, undefined, {
+      admin: null,
+      scheduleExport: schedule,
+    });
+    expect(schedule).not.toHaveBeenCalled();
+  });
+
+  it('recovers a stale export lease and reports serverless processing limits', async () => {
+    const b = await batch(1);
+    const path = `/api/v1/admin/batches/${b.batch.id}/exports`;
+    const stale = await call('POST', path, { kind: 'PUBLIC_QR', size_px: 256 });
+    await db.pool.query(
+      "update qr_review.export_jobs set status='RUNNING',started_at=now()-interval '6 minutes',lease_id=$2 where id=$1",
+      [stale.data.id, randomUUID()],
+    );
+    expect(await processOneExport(db.pool, db.config, { jobId: stale.data.id })).toBe(true);
+    expect((await call('GET', `/api/v1/admin/exports/${stale.data.id}`)).data.status).toBe('READY');
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      for (const [options, failure] of [
+        [{ maxDurationMs: 0 }, 'EXPORT_TIME_LIMIT'],
+        [{ maxArtifactBytes: 1 }, 'EXPORT_TOO_LARGE'],
+      ] as const) {
+        const queued = await call('POST', path, { kind: 'PUBLIC_QR', size_px: 256 });
+        await processOneExport(db.pool, db.config, { jobId: queued.data.id, ...options });
+        const failed = await call('GET', `/api/v1/admin/exports/${queued.data.id}`);
+        expect(failed.data).toMatchObject({
+          status: 'FAILED',
+          failure_code: failure,
+          download_path: null,
+        });
+        expect(
+          (
+            await db.pool.query('select artifact from qr_review.export_jobs where id=$1', [
+              queued.data.id,
+            ])
+          ).rows[0].artifact,
+        ).toBeNull();
+      }
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it('exports separate public and secret ZIPs, and decodes a real PNG to the permanent URL', async () => {
     const b = await batch(2);
     const pub = await call('POST', `/api/v1/admin/batches/${b.batch.id}/exports`, {
