@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { ErrorState, Loading } from '@/components/common';
 import { useAdminAuth } from '@/components/providers';
 import { useAdminResource } from '@/hooks/use-admin-resource';
+import { CreatorCredit } from '@/components/creator-credit';
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const { session, loading, client } = useAdminAuth();
@@ -39,7 +40,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           {children}
         </div>
         <footer className="border-t px-6 py-4 text-xs text-muted-foreground">
-          QR Review · Ruang kerja admin
+          QR Review · <CreatorCredit />
         </footer>
       </SidebarInset>
     </SidebarProvider>
