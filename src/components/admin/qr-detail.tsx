@@ -429,7 +429,7 @@ function SaleInformation({ qrId }: { qrId: string }) {
       <CardContent className="grid gap-6 sm:grid-cols-2">
         <Detail label="Referensi penjualan" value={sale.reference} />
         <Detail label="Waktu penjualan" value={dateTime(sale.sold_at)} />
-        <Detail label="Pembeli" value={sale.buyer_name || 'Tidak diisi'} />
+        <Detail label="Toko pembeli" value={sale.buyer_name || 'Tidak diisi'} />
         <Detail label="Kontak dukungan" value={sale.support_contact || 'Tidak diisi'} />
       </CardContent>
     </Card>

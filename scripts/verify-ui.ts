@@ -514,6 +514,12 @@ async function main() {
     await admin.getByRole('tab', { name: 'Penjualan', exact: true }).click();
     await expect(admin.getByText('Penjualan tercatat', { exact: true })).toBeVisible();
     await expect(admin.getByText(/^ACT-[0-9a-f-]{36}$/)).toBeVisible();
+    await expect(
+      admin
+        .getByText('Toko pembeli', { exact: true })
+        .locator('..')
+        .getByText('Kopi Bahagia', { exact: true }),
+    ).toBeVisible();
     await screenshot(admin, 'qr-desktop');
 
     mark('Printed /r URL renders activation, link/PIN field validation, leading-zero PIN');

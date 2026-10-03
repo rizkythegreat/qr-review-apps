@@ -439,7 +439,11 @@ describe('admin, production and inventory', () => {
     const q = b.qr[0];
     const path = `/api/v1/admin/qr-codes/${q.id}`;
     expect((await call('GET', `/api/v1/public/qr/${q.token}`)).data.activation_allowed).toBe(true);
-    const body = { reference: 'DIRECT-SALE', sold_at: new Date(Date.now() - 1000).toISOString() };
+    const body = {
+      reference: 'DIRECT-SALE',
+      sold_at: new Date(Date.now() - 1000).toISOString(),
+      buyer_name: 'Existing buyer',
+    };
     const key = randomUUID();
     const result = await call('POST', path + '/sales', body, { version: 1, key });
     expect(result.status).toBe(201);
@@ -459,7 +463,10 @@ describe('admin, production and inventory', () => {
     );
     expect(activated.status).toBe(201);
     expect((await call('GET', path)).data.status).toBe('ACTIVE');
-    expect((await call('GET', path + '/sales')).data.id).toBe(result.data.id);
+    expect((await call('GET', path + '/sales')).data).toMatchObject({
+      id: result.data.id,
+      buyer_name: 'Existing buyer',
+    });
     expect(
       (await db.pool.query('SELECT count(*) FROM qr_review.sales_records')).rows[0].count,
     ).toBe('1');
@@ -926,7 +933,7 @@ describe('activation, owner sessions and resolver', () => {
       expect(new Date(sale.sold_at).toISOString()).toBe(
         new Date(committed.activated_at).toISOString(),
       );
-      expect(sale.buyer_name).toBeNull();
+      expect(sale.buyer_name).toBe(committed.store_name);
       expect(committed.stock_status).toBe('SOLD');
       expect(
         (await db.pool.query('SELECT count(*) FROM qr_review.sales_records')).rows[0].count,
@@ -947,6 +954,28 @@ describe('activation, owner sessions and resolver', () => {
         'QR_STATE_CHANGED',
       );
     }
+  });
+  it('keeps the purchasing store name captured at activation after the store is renamed', async () => {
+    const b = await batch();
+    const q = b.qr[0];
+    const code = b.codes[0].activation_code;
+    const payload = { ...setup(code), store_name: 'Kopi Awal' };
+    expect((await call('POST', `/api/v1/public/qr/${q.token}/activate`, payload)).status).toBe(201);
+    const session = await login(q.token);
+    const update = await call(
+      'PATCH',
+      '/api/v1/owner/me',
+      { store_name: 'Kopi Baru', review_url: payload.review_url },
+      session,
+    );
+    expect(update.status).toBe(200);
+    const sale = (await call('GET', `/api/v1/admin/qr-codes/${q.id}/sales`)).data;
+    expect(sale.buyer_name).toBe('Kopi Awal');
+    expect((await call('GET', `/api/v1/admin/qr-codes/${q.id}`)).data.store_name).toBe('Kopi Baru');
+    const audit = (await call('GET', `/api/v1/admin/qr-codes/${q.id}/audit-events`)).data;
+    expect(audit.find((event: any) => event.action === 'SALE_RECORDED').changes.buyer_name).toBe(
+      'Kopi Awal',
+    );
   });
   it('automatically sells AVAILABLE units and rejects damaged and retired units', async () => {
     const b = await batch(3);

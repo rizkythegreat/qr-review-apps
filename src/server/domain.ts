@@ -409,8 +409,8 @@ export class Domain {
       const reference = `ACT-${id}`;
       sale = (
         await db.query(
-          'INSERT INTO qr_review.sales_records(id,qr_id,reference,sold_at) VALUES($1,$2,$3,$4) RETURNING id,reference',
-          [id, q.id, reference, period.started_at],
+          'INSERT INTO qr_review.sales_records(id,qr_id,reference,sold_at,buyer_name) VALUES($1,$2,$3,$4,$5) RETURNING id,reference',
+          [id, q.id, reference, period.started_at, b.store_name],
         )
       ).rows[0];
     }
@@ -443,6 +443,7 @@ export class Domain {
         stock_status: 'SOLD',
         sale_id: sale.id,
         reference: sale.reference,
+        buyer_name: b.store_name,
       });
     await invalidateSnapshot(db, q);
     return {

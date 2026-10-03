@@ -1,5 +1,5 @@
 {
-  "verified_at": "2026-10-03T07:36:37.180Z",
+  "verified_at": "2026-10-03T07:51:10.088Z",
   "runtime": "Real production Next.js, temporary local PostgreSQL, signature-verified Auth simulation, Chromium desktop and mobile",
   "checks": [
     "Admin login, invalid credentials/allowlist, protected-route redirect and empty dashboard",

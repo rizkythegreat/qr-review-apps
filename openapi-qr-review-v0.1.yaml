@@ -1480,7 +1480,7 @@ paths:
       operationId: activateQr
       summary: Aktifkan unit toko
       description: 'Memerlukan UNACTIVATED dengan stok GENERATED, AVAILABLE atau SOLD dan kode benar. Kode salah: 401 INVALID_ACTIVATION_CODE; sudah aktif: 409 QR_ALREADY_ACTIVE; retired: 410 QR_RETIRED. Hash PIN, konsumsi
-        kode, simpan toko dan buat ownership_id pertama atomik. Stok GENERATED/AVAILABLE otomatis menjadi SOLD dengan satu sale berreferensi ACT-UUID dan sold_at sama dengan activated_at; sale lama untuk SOLD dipertahankan. Tidak membuat cookie; pemilik login via /owner/sessions.
+        kode, simpan toko dan buat ownership_id pertama atomik. Stok GENERATED/AVAILABLE otomatis menjadi SOLD dengan satu sale berreferensi ACT-UUID dan sold_at sama dengan activated_at; buyer_name menyimpan nama toko saat aktivasi dan tidak mengikuti perubahan profil berikutnya. Sale lama untuk SOLD dipertahankan. Tidak membuat cookie; pemilik login via /owner/sessions.
         Aktivasi paralel hanya satu sukses. Retry key+payload yang sama mereplay hasil committed bila ownership/state
         belum berubah; jika berubah 409 QR_STATE_CHANGED. Key baru setelah aktif bukan replay.'
       tags:
@@ -2928,6 +2928,7 @@ components:
         buyer_name:
           type: string
           nullable: true
+          description: Untuk penjualan otomatis, nama toko saat aktivasi. Tetap sama setelah nama toko diubah. Catatan lama dapat berisi nama pembeli manual atau null.
         support_contact:
           type: string
           nullable: true
