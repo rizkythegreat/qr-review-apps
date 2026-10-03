@@ -113,6 +113,8 @@ export function LoginForm() {
                 Untuk pemilik toko, gunakan{' '}
                 <Link
                   href="/manage"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="font-medium text-foreground underline underline-offset-4"
                 >
                   token dan PIN

@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useStandalone } from '@/hooks/use-standalone';
 import {
   Dialog,
   DialogContent,
@@ -16,20 +17,8 @@ interface InstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-function standalone() {
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
-  );
-}
-function subscribeStandalone(callback: () => void) {
-  const media = window.matchMedia('(display-mode: standalone)');
-  media.addEventListener('change', callback);
-  return () => media.removeEventListener('change', callback);
-}
-
 export function InstallApp({ showLabel = false }: { showLabel?: boolean }) {
-  const isStandalone = useSyncExternalStore(subscribeStandalone, standalone, () => true);
+  const isStandalone = useStandalone(true);
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [open, setOpen] = useState(false);

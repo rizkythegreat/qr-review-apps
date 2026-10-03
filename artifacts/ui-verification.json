@@ -1,5 +1,5 @@
 {
-  "verified_at": "2026-10-03T04:57:43.361Z",
+  "verified_at": "2026-10-03T05:59:21.958Z",
   "runtime": "Real production Next.js, temporary local PostgreSQL, signature-verified Auth simulation, Chromium desktop and mobile",
   "checks": [
     "Admin login, invalid credentials/allowlist, protected-route redirect and empty dashboard",
@@ -20,6 +20,7 @@
     "Persisted credential rate limit displays countdown and disables submit",
     "Service unavailable state and successful manual retry",
     "Responsive desktop/mobile, mobile sidebar closes, unknown QR/help/home",
+    "Installed admin retains its page when opening owner view, public pages provide return to admin, ordinary browser hides admin shortcut",
     "Admin logout removes session and protected data"
   ],
   "browser_page_errors": 0,

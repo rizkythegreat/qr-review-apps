@@ -28,7 +28,12 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-1">
           <InstallApp />
           <Button asChild variant="ghost" size="sm">
-            <Link href="/manage" aria-label="Halaman pemilik">
+            <Link
+              href="/manage"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Halaman pemilik"
+            >
               <ExternalLink />
               <span className="hidden sm:inline">Halaman pemilik</span>
             </Link>

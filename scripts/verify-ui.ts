@@ -880,6 +880,39 @@ async function main() {
     await screenshot(owner, 'home-mobile');
     mark('Responsive desktop/mobile, mobile sidebar closes, unknown QR/help/home');
 
+    stage = 'installed admin navigation';
+    await expect(owner.getByRole('link', { name: 'Kembali ke admin', exact: true })).toHaveCount(0);
+    const installed = await adminContext.newPage();
+    await installed.setViewportSize({ width: 390, height: 844 });
+    installed.on('pageerror', (error) => consoleErrors.push(error.name));
+    await installed.addInitScript(() => {
+      Object.defineProperty(navigator, 'standalone', { value: true, configurable: true });
+    });
+    for (const path of ['/manage', '/help', '/']) {
+      stage = `installed admin return ${path}`;
+      await installed.goto(origin + path);
+      await expect(
+        installed.getByRole('link', { name: 'Kembali ke admin', exact: true }),
+      ).toBeVisible();
+      expect(
+        await installed.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      ).toBe(true);
+    }
+    await installed.getByRole('link', { name: 'Kembali ke admin', exact: true }).click();
+    await expect(installed).toHaveURL(origin + '/admin');
+    const ownerLink = installed.getByRole('link', { name: 'Halaman pemilik', exact: true });
+    await expect(ownerLink).toBeVisible();
+    const opened = installed.waitForEvent('popup');
+    await ownerLink.click();
+    const ownerWindow = await opened;
+    await ownerWindow.waitForURL(origin + '/manage');
+    await expect(installed).toHaveURL(origin + '/admin');
+    await ownerWindow.close();
+    await installed.close();
+    mark(
+      'Installed admin retains its page when opening owner view, public pages provide return to admin, ordinary browser hides admin shortcut',
+    );
+
     stage = 'admin logout';
     await admin.getByRole('button', { name: 'Buka navigasi', exact: true }).click();
     await admin.getByRole('button', { name: /Administrator/ }).click();

@@ -16,7 +16,7 @@ Tailwind CSS v4 dan komponen shadcn/ui dari registry resmi, preset Radix Nova. B
 
 ## Verifikasi
 
-Build produksi, typecheck dan lint berhasil. Tes backend: 81 unit + 38 integrasi. [Laporan browser](../artifacts/ui-verification.json) merekam 19 skenario yang lulus tanpa error JavaScript; Chromium memakai viewport desktop 1440 × 1000 dan mobile 390 × 844. Log aktivitas juga diperiksa pada iPad 820 × 1180. Tes berjalan terhadap server Next.js produksi dengan database PostgreSQL sementara dan Auth simulasi yang memverifikasi signature JWT. Kredensial Supabase lokal tidak digunakan untuk mengubah data produksi saat pengujian. Login memakai akun Supabase asli tetap perlu dicoba oleh admin pada project tersebut.
+Build produksi, typecheck dan lint berhasil. Tes backend: 83 unit + 39 integrasi. [Laporan browser](../artifacts/ui-verification.json) merekam 20 skenario yang lulus tanpa error JavaScript; Chromium memakai viewport desktop 1440 × 1000 dan mobile 390 × 844. Log aktivitas juga diperiksa pada iPad 820 × 1180. Tes berjalan terhadap server Next.js produksi dengan database PostgreSQL sementara dan Auth simulasi yang memverifikasi signature JWT. Kredensial Supabase lokal tidak digunakan untuk mengubah data produksi saat pengujian. Login memakai akun Supabase asli tetap perlu dicoba oleh admin pada project tersebut.
 
 | Tahap / kebutuhan | Bukti browser                                                                                                                                                                            |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -28,6 +28,7 @@ Build produksi, typecheck dan lint berhasil. Tes backend: 81 unit + 38 integrasi
 | Dukungan          | Reset/transfer dengan referensi verifikasi, grant sekali pakai, fragment dihapus sebelum request dan tidak disimpan di browser, transfer memisahkan statistik                            |
 | Status unit       | Suspend menghasilkan fallback dan owner read-only, resume menghasilkan redirect, retire terminal 410, riwayat dengan label manusia, rotasi menolak kode lama, DAMAGED menonaktifkan unit |
 | Log aktivitas     | Riwayat seluruh QR, pagination, filter token/tindakan/tanggal WIB, detail perubahan, hasil kosong/reset/refresh, tautan ke tab Riwayat QR, desktop/iPad/mobile                           |
+| Navigasi aplikasi | Mode standalone menyediakan kembali ke admin dari kelola/bantuan/beranda; membuka halaman pemilik mempertahankan halaman admin; browser biasa tidak menampilkan pintasan admin           |
 | Retry jaringan    | Response batch dan grant sudah commit sengaja diputus; retry memakai payload/key/X-QR-If-Match awal dan menghasilkan satu batch/grant                                                    |
 | Gangguan / mobile | API 503 dengan retry berhasil, unknown QR, home/help, sidebar mobile menutup setelah navigasi, nama toko panjang tanpa overflow halaman                                                  |
 
