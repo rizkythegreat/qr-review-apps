@@ -318,6 +318,50 @@ async function main() {
       if (next.exitCode !== null || retry === 99) throw new Error('Next startup failed');
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
+    stage = 'social link preview';
+    let previewUrl = '';
+    for (const userAgent of [
+      'WhatsApp/2.24',
+      'facebookexternalhit/1.1',
+      'LinkedInBot/1.0',
+      'Twitterbot/1.0',
+    ]) {
+      const pageResponse = await ownerContext.request.get(origin, {
+        headers: { 'User-Agent': userAgent },
+      });
+      expect(pageResponse.status()).toBe(200);
+      const html = await pageResponse.text();
+      const head = html.slice(0, html.indexOf('</head>'));
+      expect(head).toContain('property="og:title"');
+      expect(head).toContain('property="og:description"');
+      expect(head).toContain('property="og:site_name" content="QR Review"');
+      expect(head).toContain('property="og:image:width" content="1200"');
+      expect(head).toContain('property="og:image:height" content="630"');
+      expect(head).toContain('name="twitter:card" content="summary_large_image"');
+      const match = /<meta property="og:image" content="([^"]+)"/.exec(head);
+      expect(match).not.toBeNull();
+      previewUrl = match![1].replaceAll('&amp;', '&');
+      expect(new URL(previewUrl).origin).toBe(origin);
+      const twitter = /<meta name="twitter:image" content="([^"]+)"/.exec(head);
+      expect(twitter).not.toBeNull();
+      expect(new URL(twitter![1].replaceAll('&amp;', '&')).pathname).toBe('/opengraph-image');
+    }
+    const previewResponse = await ownerContext.request.get(previewUrl);
+    expect(previewResponse.status()).toBe(200);
+    expect(previewResponse.headers()['content-type']).toContain('image/png');
+    const previewBuffer = await previewResponse.body();
+    const preview = PNG.sync.read(previewBuffer);
+    expect([preview.width, preview.height]).toEqual([1200, 630]);
+    const qrPreview = jsQR(new Uint8ClampedArray(preview.data), preview.width, preview.height);
+    expect(qrPreview).not.toBeNull();
+    expect(new URL(qrPreview!.data).protocol).toBe('https:');
+    expect(new URL(qrPreview!.data).pathname).toBe('/');
+    expect(new URL(qrPreview!.data).search).toBe('');
+    await writeFile('artifacts/social-preview.png', previewBuffer);
+    mark(
+      'Anonymous social crawlers receive head metadata, absolute OG/Twitter image URLs, 1200x630 PNG and public homepage QR',
+    );
+
     stage = 'admin authentication';
     await admin.goto(origin + '/admin');
     await expect(admin).toHaveURL(/\/admin\/login/);

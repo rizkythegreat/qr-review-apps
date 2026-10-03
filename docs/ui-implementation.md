@@ -16,7 +16,7 @@ Tailwind CSS v4 dan komponen shadcn/ui dari registry resmi, preset Radix Nova. B
 
 ## Verifikasi
 
-Build produksi, typecheck dan lint berhasil. Tes backend: 83 unit + 45 integrasi. [Laporan browser](../artifacts/ui-verification.json) merekam 21 skenario yang lulus tanpa error JavaScript; Chromium memakai viewport desktop 1440 × 1000 dan mobile 390 × 844. Log aktivitas juga diperiksa pada iPad 820 × 1180. Tes berjalan terhadap server Next.js produksi dengan database PostgreSQL sementara dan Auth simulasi yang memverifikasi signature JWT. Kredensial Supabase lokal tidak digunakan untuk mengubah data produksi saat pengujian. Login memakai akun Supabase asli tetap perlu dicoba oleh admin pada project tersebut.
+Build produksi, typecheck dan lint berhasil. Tes backend: 83 unit + 45 integrasi. [Laporan browser](../artifacts/ui-verification.json) merekam 22 skenario yang lulus tanpa error JavaScript; Chromium memakai viewport desktop 1440 × 1000 dan mobile 390 × 844. Log aktivitas juga diperiksa pada iPad 820 × 1180. Tes berjalan terhadap server Next.js produksi dengan database PostgreSQL sementara dan Auth simulasi yang memverifikasi signature JWT. Kredensial Supabase lokal tidak digunakan untuk mengubah data produksi saat pengujian. Login memakai akun Supabase asli tetap perlu dicoba oleh admin pada project tersebut.
 
 | Tahap / kebutuhan | Bukti browser                                                                                                                                                                                               |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -48,3 +48,5 @@ Build terpisah menjaga server dev yang berjalan di port 3000. Setelah menghapus/
 Mode gelap diperiksa pada dashboard desktop/mobile, kelola pemilik, dan login admin; preferensi bertahan setelah reload dan mengikuti perubahan sistem saat opsi sistem dipilih.
 
 Pratinjau: [dashboard gelap desktop](../artifacts/ui/dashboard-dark-desktop.png), [dashboard gelap mobile](../artifacts/ui/dashboard-dark-mobile.png), [login admin gelap](../artifacts/ui/login-dark-mobile.png), [login pemilik gelap](../artifacts/ui/owner-login-dark-mobile.png).
+
+Preview tautan: crawler WhatsApp, Facebook, LinkedIn, dan X menerima metadata di head, URL gambar absolut, Open Graph PNG 1200×630, serta QR menuju beranda publik. Gambar tidak memuat data unit, kode aktivasi, atau PIN.

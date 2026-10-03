@@ -7,14 +7,37 @@ import Script from 'next/script';
 import { Providers } from '@/components/providers';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { siteDescription, siteOrigin, siteTitle } from '@/lib/site-metadata';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 const captureGrant = `(function(){var p=location.pathname;if((p==='/pin-reset'||p==='/ownership-transfer')&&location.hash){window.__qrReviewGrant={path:p,token:new URLSearchParams(location.hash.slice(1)).get('grant')||''};history.replaceState(history.state,'',p+location.search)}})();`;
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: { default: 'QR Review — Kelola QR toko', template: '%s · QR Review' },
-  description: 'Produksi, aktivasi, dan kelola QR untuk akses ulasan toko.',
+  metadataBase: siteOrigin,
+  title: { default: siteTitle, template: '%s · QR Review' },
+  description: siteDescription,
+  openGraph: {
+    type: 'website',
+    locale: 'id_ID',
+    siteName: 'QR Review',
+    title: siteTitle,
+    description: siteDescription,
+    url: '/',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: siteTitle,
+    description: siteDescription,
+    images: [
+      {
+        url: '/opengraph-image',
+        width: 1200,
+        height: 630,
+        alt: 'QR Review — Kelola QR toko untuk Google Review.',
+      },
+    ],
+  },
   robots: { index: false, follow: false },
   applicationName: 'QR Review',
   appleWebApp: { capable: true, title: 'QR Review', statusBarStyle: 'default' },

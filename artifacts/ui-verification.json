@@ -1,7 +1,8 @@
 {
-  "verified_at": "2026-10-03T10:58:11.596Z",
+  "verified_at": "2026-10-03T13:25:36.554Z",
   "runtime": "Real production Next.js, temporary local PostgreSQL, signature-verified Auth simulation, Chromium desktop and mobile",
   "checks": [
+    "Anonymous social crawlers receive head metadata, absolute OG/Twitter image URLs, 1200x630 PNG and public homepage QR",
     "Admin login, invalid credentials/allowlist, protected-route redirect and empty dashboard",
     "Create batch: committed response lost, identical retry, one batch only",
     "Separate public/secret exports, background polling, ZIP download and PNG decode",

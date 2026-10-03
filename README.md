@@ -54,6 +54,7 @@ Pantau produksi, stok, penjualan, dan status seluruh unit QR.
 - **Akses tanpa membuat akun:** masuk ke halaman kelola menggunakan token dan PIN.
 - **Tujuan ulasan yang dapat diperbarui:** perubahan link berlaku tanpa mengganti QR yang sudah dicetak.
 - **Statistik kunjungan:** total kunjungan dan waktu akses terakhir untuk periode kepemilikan toko.
+- **Preview tautan:** metadata Open Graph dan gambar 1200×630 untuk berbagi link beranda di platform yang mendukung preview.
 - **Tampilan responsif:** mendukung desktop, tablet, dan mobile dengan tema terang, gelap, atau mengikuti sistem.
 - **Instalasi ke home screen:** membuka aplikasi dalam mode standalone, langsung ke halaman admin.
 
