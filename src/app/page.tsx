@@ -1,8 +1,7 @@
 import Link from 'next/link';
-import { ArrowRight, ArrowUpRight, Link2, QrCode, ShieldCheck, Store } from 'lucide-react';
+import { ArrowRight, Link2, QrCode, ShieldCheck } from 'lucide-react';
 import { PublicShell } from '@/components/public-shell';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 export default function Home() {
@@ -62,42 +61,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <div className="grid gap-4 py-6 sm:grid-cols-2">
-        <Card className="shadow-none">
-          <CardHeader>
-            <Store className="mb-3 size-5 text-muted-foreground" />
-            <CardTitle className="text-base">Untuk pemilik toko</CardTitle>
-            <CardDescription>
-              Lihat kunjungan QR, ubah link review, dan kelola PIN toko Anda.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" className="w-full justify-between">
-              <Link href="/manage">
-                Masuk dengan token dan PIN
-                <ArrowRight />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card className="shadow-none">
-          <CardHeader>
-            <QrCode className="mb-3 size-5 text-muted-foreground" />
-            <CardTitle className="text-base">Untuk admin</CardTitle>
-            <CardDescription>
-              Kelola produksi, ekspor QR, stok, penjualan, dan bantuan pemilik.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" className="w-full justify-between">
-              <Link href="/admin/login">
-                Buka ruang kerja admin
-                <ArrowUpRight />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
     </PublicShell>
   );
 }
