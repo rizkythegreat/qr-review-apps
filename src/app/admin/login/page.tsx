@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { LoginForm } from '@/components/login-form';
 import { Brand, Loading } from '@/components/common';
 import type { Metadata } from 'next';
+import { InstallApp } from '@/components/install-app';
 
 export const metadata: Metadata = { title: 'Masuk admin' };
 export default function AdminLoginPage() {
@@ -12,6 +13,9 @@ export default function AdminLoginPage() {
         <Suspense fallback={<Loading />}>
           <LoginForm />
         </Suspense>
+        <div className="mt-5 flex justify-center">
+          <InstallApp showLabel />
+        </div>
       </div>
     </main>
   );

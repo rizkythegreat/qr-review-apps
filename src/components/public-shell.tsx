@@ -4,7 +4,6 @@ import { ArrowLeft, CircleHelp, ShieldCheck } from 'lucide-react';
 import { Brand } from '@/components/common';
 import { Button } from '@/components/ui/button';
 import { CreatorCredit } from '@/components/creator-credit';
-import { InstallApp } from '@/components/install-app';
 
 export function PublicShell({
   children,
@@ -20,15 +19,12 @@ export function PublicShell({
       <header className="border-b bg-background">
         <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-5 sm:px-8">
           <Brand />
-          <div className="flex items-center gap-1">
-            <InstallApp />
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/help">
-                <CircleHelp />
-                Bantuan
-              </Link>
-            </Button>
-          </div>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/help">
+              <CircleHelp />
+              Bantuan
+            </Link>
+          </Button>
         </div>
       </header>
       <main

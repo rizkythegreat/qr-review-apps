@@ -112,6 +112,6 @@ Akun Supabase Auth, allowlist admin, ledger migrasi, struktur tabel, indeks, RLS
 
 ### Install ke home screen
 
-Aplikasi menyediakan `/manifest.webmanifest`, ikon PNG 192/512 px, ikon maskable, dan metadata Apple. Aplikasi yang diinstal terbuka dalam mode standalone dengan nama **QR Review**, mulai dari beranda. Gunakan URL HTTPS production untuk instalasi; data tetap memerlukan koneksi internet.
+Aplikasi menyediakan `/manifest.webmanifest`, ikon PNG 192/512 px, ikon maskable, dan metadata Apple. Aplikasi yang diinstal terbuka dalam mode standalone dengan nama **QR Review**, langsung ke `/admin`. Jika belum login, aplikasi mengarahkan ke halaman login admin. Gunakan URL HTTPS production untuk instalasi; data tetap memerlukan koneksi internet.
 
-Tombol **Install** tersedia di header halaman publik dan admin. Chrome/Edge membuka prompt instalasi ketika browser menyediakannya; jika belum tersedia, tombol menampilkan petunjuk melalui menu browser. Di iPhone/iPad, buka di Safari, pilih **Bagikan → Tambahkan ke Layar Utama**, aktifkan **Buka sebagai App** jika tersedia, lalu **Tambah**. Tombol disembunyikan saat aplikasi dibuka dalam mode standalone.
+Tombol **Install** tersedia di header admin dan halaman login admin. Halaman beranda dan kelola pemilik tidak menampilkan tombol install. Chrome/Edge membuka prompt instalasi ketika browser menyediakannya; jika belum tersedia, tombol menampilkan petunjuk melalui menu browser. Di iPhone/iPad, buka halaman admin di Safari, pilih **Bagikan → Tambahkan ke Layar Utama**, aktifkan **Buka sebagai App** jika tersedia, lalu **Tambah**. Tombol disembunyikan saat aplikasi dibuka dalam mode standalone.

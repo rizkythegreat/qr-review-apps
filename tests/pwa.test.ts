@@ -3,10 +3,10 @@ import { it, expect } from 'vitest';
 import { PNG } from 'pngjs';
 import manifest from '../src/app/manifest';
 
-it('provides a stable app identity, standalone launch and valid installation icons', () => {
+it('preserves app identity and launches the installed app in admin with valid icons', () => {
   const app = manifest();
   expect(app.id).toBe('/');
-  expect(app.start_url).toBe('/');
+  expect(app.start_url).toBe('/admin');
   expect(app.scope).toBe('/');
   expect(app.display).toBe('standalone');
   expect(app.prefer_related_applications).toBe(false);

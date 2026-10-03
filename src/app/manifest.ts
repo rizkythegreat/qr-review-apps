@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'QR Review',
     description: 'Produksi, aktivasi, dan kelola QR untuk akses ulasan toko.',
     lang: 'id',
-    start_url: '/',
+    start_url: '/admin',
     scope: '/',
     display: 'standalone',
     background_color: '#fafafa',

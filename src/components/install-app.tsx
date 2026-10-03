@@ -28,7 +28,7 @@ function subscribeStandalone(callback: () => void) {
   return () => media.removeEventListener('change', callback);
 }
 
-export function InstallApp() {
+export function InstallApp({ showLabel = false }: { showLabel?: boolean }) {
   const isStandalone = useSyncExternalStore(subscribeStandalone, standalone, () => true);
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
@@ -87,7 +87,7 @@ export function InstallApp() {
         onClick={() => void install()}
       >
         <Download />
-        <span className="hidden sm:inline">Install</span>
+        <span className={showLabel ? undefined : 'hidden sm:inline'}>Install</span>
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
