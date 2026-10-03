@@ -12,7 +12,8 @@ export function getApplication() {
     const config = readConfig();
     const statisticsPool = createPool(config, {
       max: 2,
-      connectionTimeoutMillis: config.STATISTICS_TIMEOUT_MS,
+      // Connection/TLS setup can take longer than a statistics SQL statement.
+      connectionTimeoutMillis: 10_000,
       statement_timeout: config.STATISTICS_TIMEOUT_MS,
       application_name: 'qr-review-statistics',
     });
@@ -37,9 +38,13 @@ export async function handleApi(request: Request, scheduleExport?: (id: string) 
     return errorResponse(unavailable(), id);
   }
 }
-export async function handleResolver(request: Request, token: string) {
+export async function handleResolver(
+  request: Request,
+  token: string,
+  waitUntil?: (task: Promise<void>) => void,
+) {
   try {
-    return await getApplication().resolve(request, token);
+    return await getApplication().resolve(request, token, waitUntil);
   } catch (error) {
     const id = randomUUID();
     logFailure(

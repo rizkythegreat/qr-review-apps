@@ -173,6 +173,7 @@ async function resolve(
     headers?: Record<string, string>;
     app?: Application;
     query?: string;
+    waitUntil?: (task: Promise<void>) => void;
   } = {},
 ) {
   return (options.app || db.app).resolve(
@@ -181,6 +182,7 @@ async function resolve(
       headers: { 'x-test-ip': '198.51.100.1', ...options.headers },
     }),
     token,
+    options.waitUntil,
   );
 }
 beforeAll(async () => {
@@ -636,6 +638,84 @@ describe('activation, owner sessions and resolver', () => {
         .total_visits,
     ).toBe('1');
   });
+  it('keeps delayed statistics alive after redirect and counts repeated eligible scans', async () => {
+    const b = await active();
+    const { recordVisit } = await import('../../src/server/statistics');
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const delayed = new Application({
+      pool: db.pool,
+      config: db.config,
+      recordVisit: async (visit) => {
+        await gate;
+        await recordVisit(db.pool, visit, 150);
+      },
+    });
+    const tasks: Promise<void>[] = [];
+    const waitUntil = (task: Promise<void>) => {
+      tasks.push(task);
+    };
+    expect((await resolve(b.q.token, { app: delayed, waitUntil })).status).toBe(302);
+    expect(tasks).toHaveLength(1);
+    expect(
+      (
+        await db.pool.query('select total_visits from qr_review.ownership_periods where id=$1', [
+          b.q.ownership_id,
+        ])
+      ).rows[0].total_visits,
+    ).toBe('0');
+    // The redirect has completed while the write remains pending beyond its old time budget.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    release();
+    await Promise.all(tasks);
+    tasks.length = 0;
+    for (let i = 0; i < 2; i++) await resolve(b.q.token, { app: delayed, waitUntil });
+    await Promise.all(tasks);
+    expect(
+      (
+        await db.pool.query('select total_visits from qr_review.ownership_periods where id=$1', [
+          b.q.ownership_id,
+        ])
+      ).rows[0].total_visits,
+    ).toBe('3');
+    tasks.length = 0;
+    await resolve(b.q.token, { app: delayed, waitUntil, method: 'HEAD' });
+    await resolve(b.q.token, { app: delayed, waitUntil, headers: { 'User-Agent': 'Googlebot' } });
+    expect(tasks).toHaveLength(0);
+  });
+
+  it('handles background statistics failure without rejecting the task or redirect', async () => {
+    const b = await active();
+    const broken = new Application({
+      pool: db.pool,
+      config: db.config,
+      recordVisit: async () => {
+        throw Object.assign(new Error('private database details'), { code: '28P01' });
+      },
+    });
+    const tasks: Promise<void>[] = [];
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const response = await resolve(b.q.token, {
+        app: broken,
+        waitUntil: (task) => {
+          tasks.push(task);
+        },
+      });
+      expect(response.status).toBe(302);
+      await Promise.all(tasks);
+      expect(JSON.parse(log.mock.calls[0][0])).toMatchObject({
+        event: 'statistics_recording_failed',
+        error_code: '28P01',
+      });
+      expect(JSON.stringify(log.mock.calls)).not.toContain('private');
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it('caps slow statistics separately and still returns the redirect', async () => {
     const b = await active();
     const slow = new Application({

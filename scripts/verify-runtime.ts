@@ -264,8 +264,13 @@ async function main() {
       scan.headers['cache-control'] !== 'no-store, max-age=0'
     )
       throw new Error('Resolver redirect invalid');
-    const stats = (await json('GET', '/api/v1/owner/me/stats', undefined, { Cookie: cookie })).value
-      .data;
+    let stats;
+    for (let i = 0; i < 30; i++) {
+      stats = (await json('GET', '/api/v1/owner/me/stats', undefined, { Cookie: cookie })).value
+        .data;
+      if (stats.total_visits === 1) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     if (stats.total_visits !== 1) throw new Error('Durable statistics invalid');
     const exported = (
       await json('POST', `/api/v1/admin/batches/${b.id}/exports`, {
@@ -294,6 +299,7 @@ async function main() {
       owner_update: 200,
       resolver: 302,
       durable_visits: stats.total_visits,
+      statistics_background: 'passed after redirect',
       public_zip: 200,
       export_background: 'passed without standalone worker',
     };

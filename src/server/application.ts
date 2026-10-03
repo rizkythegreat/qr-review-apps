@@ -424,7 +424,11 @@ export class Application {
       },
     };
   }
-  async resolve(request: Request, publicToken: string): Promise<Response> {
+  async resolve(
+    request: Request,
+    publicToken: string,
+    waitUntil?: (task: Promise<void>) => void,
+  ): Promise<Response> {
     const requestId = randomUUID(),
       head = request.method === 'HEAD';
     try {
@@ -451,17 +455,32 @@ export class Application {
             ((v: Visit) => recordVisit(this.pool, v, this.config.STATISTICS_TIMEOUT_MS));
           let timeout: ReturnType<typeof setTimeout> | undefined;
           try {
-            await Promise.race([
-              record(visit),
-              new Promise<never>((_, reject) => {
-                timeout = setTimeout(
-                  () => reject(new Error('statistics_timeout')),
-                  this.config.STATISTICS_TIMEOUT_MS,
-                );
-              }),
-            ]);
-          } catch {
-            logFailure('statistics_recording_failed', requestId);
+            const recording = Promise.resolve().then(() => record(visit));
+            if (waitUntil) {
+              waitUntil(
+                recording.catch((error) => {
+                  logFailure(
+                    'statistics_recording_failed',
+                    requestId,
+                    undefined,
+                    error,
+                    this.config,
+                  );
+                }),
+              );
+            } else {
+              await Promise.race([
+                recording,
+                new Promise<never>((_, reject) => {
+                  timeout = setTimeout(
+                    () => reject(new Error('statistics_timeout')),
+                    this.config.STATISTICS_TIMEOUT_MS,
+                  );
+                }),
+              ]);
+            }
+          } catch (error) {
+            logFailure('statistics_recording_failed', requestId, undefined, error, this.config);
           } finally {
             clearTimeout(timeout);
           }

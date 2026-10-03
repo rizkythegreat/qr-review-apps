@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextFetchEvent, type NextRequest, NextResponse } from 'next/server';
 import { handleResolver } from '@/server/runtime';
 
-export async function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest, event: NextFetchEvent) {
   const token = request.nextUrl.pathname.split('/')[2];
-  const response = await handleResolver(request, token);
+  const response = await handleResolver(request, token, (task) => event.waitUntil(task));
   if (response.status === 200 && response.headers.get('X-QR-Page') === 'activation') {
     const page = NextResponse.next();
     for (const name of [
