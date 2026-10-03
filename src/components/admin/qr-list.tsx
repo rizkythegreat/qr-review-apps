@@ -76,7 +76,7 @@ export function QrList({
       <CardContent className="space-y-5 px-0 pb-0">
         <form onSubmit={submit} className="flex flex-col gap-3 px-6 lg:flex-row">
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
               name="search"
               aria-label="Cari token atau nama toko"
