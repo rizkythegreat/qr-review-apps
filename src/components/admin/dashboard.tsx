@@ -85,18 +85,19 @@ export function AdminDashboard() {
             <Card className="bg-muted/35">
               <CardHeader>
                 <Clock className="mb-2 size-5 text-muted-foreground" />
-                <CardTitle className="text-base">Siapkan unit berikutnya</CardTitle>
+                <CardTitle className="text-base">Catat penjualan unit baru</CardTitle>
                 <CardDescription>
-                  {number(data.stock_counts.GENERATED)} unit menunggu pemeriksaan kualitas.
+                  {number(data.stock_counts.GENERATED)} unit baru tersedia di stok.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="mb-5 text-sm leading-relaxed text-muted-foreground">
-                  Periksa hasil cetak, lalu tandai unit layak sebagai siap dijual.
+                  Catat penjualan ketika unit diberikan kepada toko agar pemilik dapat mengaktifkan
+                  QR.
                 </p>
                 <Button asChild variant="outline" className="w-full justify-between">
                   <Link href="/admin/qr-codes?stock_status=GENERATED">
-                    Lihat antrean QC
+                    Lihat unit baru
                     <ArrowRight />
                   </Link>
                 </Button>

@@ -439,16 +439,13 @@ async function main() {
     await expect(admin.locator('tbody tr')).toHaveCount(1);
     mark('QR search and cursor pagination');
 
-    stage = 'QC and sales';
+    stage = 'direct sales';
     await owner.goto(`${origin}/r/${qr.token}`);
     await expect(owner.getByText('QR belum siap diaktifkan', { exact: true })).toBeVisible();
     await admin.goto(`${origin}/admin/qr-codes/${qr.id}`);
-    await admin.getByRole('button', { name: 'Lolos QC · siap dijual', exact: true }).click();
-    await admin
-      .getByRole('dialog')
-      .getByLabel(fieldLabel('Catatan pemeriksaan'))
-      .fill('Cetak bagus dan QR berhasil dipindai');
-    await admin.getByRole('button', { name: 'Konfirmasi siap dijual', exact: true }).click();
+    await expect(
+      admin.getByRole('button', { name: 'Lolos QC · siap dijual', exact: true }),
+    ).toHaveCount(0);
     await admin.getByRole('button', { name: 'Catat penjualan', exact: true }).click();
     await admin.getByLabel(fieldLabel('Referensi penjualan')).fill('UI-SALE-001');
     await admin.getByLabel(fieldLabel('Nama pembeli (opsional)')).fill('Kopi Bahagia');
@@ -461,7 +458,9 @@ async function main() {
       (await readFile((await (await svgDownload).path())!, 'utf8')).includes('<svg'),
     ).toBeTruthy();
     await screenshot(admin, 'qr-desktop');
-    mark('Activation blocked before sale, QC, recorded sale and SVG download');
+    mark(
+      'Activation blocked before sale, direct sale without manual QC, recorded sale and SVG download',
+    );
 
     stage = 'activation';
     const response = await owner.goto(`${origin}/r/${qr.token}`);
@@ -756,19 +755,11 @@ async function main() {
 
     stage = 'rotated activation and expired session';
     const currentQr = (await api(`/api/v1/admin/qr-codes/${rotatedQr.id}`)).data;
-    const available = (
-      await api(
-        `/api/v1/admin/qr-codes/${rotatedQr.id}/stock`,
-        'PATCH',
-        { stock_status: 'AVAILABLE', reason: 'Unit rotasi telah lulus pemeriksaan cetak' },
-        `"v${currentQr.version}"`,
-      )
-    ).data;
     await api(
       `/api/v1/admin/qr-codes/${rotatedQr.id}/sales`,
       'POST',
       { reference: 'UI-SALE-ROTATE', sold_at: new Date(Date.now() - 1000).toISOString() },
-      `"v${available.version}"`,
+      `"v${currentQr.version}"`,
     );
     await owner.goto(`${origin}/r/${rotatedQr.token}`);
     await owner

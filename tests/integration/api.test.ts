@@ -316,7 +316,7 @@ describe('admin, production and inventory', () => {
     ).toMatchObject({ stock_status: 'AVAILABLE', version: 2 });
   });
 
-  it('enforces If-Match, QC transitions and one durable sale per unit', async () => {
+  it('enforces If-Match, legacy stock transitions and one durable sale per unit', async () => {
     const { qr } = await batch();
     const q = qr[0],
       path = `/api/v1/admin/qr-codes/${q.id}`;
@@ -363,6 +363,63 @@ describe('admin, production and inventory', () => {
       ).error.code,
     ).toBe('STOCK_TRANSITION_INVALID');
   });
+  it('records a new unit sale directly and keeps activation, audit and retry consistent', async () => {
+    const b = await batch();
+    const q = b.qr[0];
+    const path = `/api/v1/admin/qr-codes/${q.id}`;
+    expect((await call('GET', `/api/v1/public/qr/${q.token}`)).data.activation_allowed).toBe(false);
+    const body = { reference: 'DIRECT-SALE', sold_at: new Date(Date.now() - 1000).toISOString() };
+    const key = randomUUID();
+    const result = await call('POST', path + '/sales', body, { version: 1, key });
+    expect(result.status).toBe(201);
+    expect((await call('GET', path)).data).toMatchObject({ stock_status: 'SOLD', version: 2 });
+    const replay = await call('POST', path + '/sales', body, { version: 1, key });
+    expect(replay.data.id).toBe(result.data.id);
+    expect(
+      (await db.pool.query('SELECT count(*) FROM qr_review.sales_records')).rows[0].count,
+    ).toBe('1');
+    const audit = (await call('GET', path + '/audit-events')).data;
+    expect(audit.map((event: any) => event.action)).toEqual(['SALE_RECORDED', 'BATCH_GENERATED']);
+    expect((await call('GET', `/api/v1/public/qr/${q.token}`)).data.activation_allowed).toBe(true);
+    const activated = await call(
+      'POST',
+      `/api/v1/public/qr/${q.token}/activate`,
+      setup(b.codes[0].activation_code),
+    );
+    expect(activated.status).toBe(201);
+    expect((await call('GET', path)).data.status).toBe('ACTIVE');
+  });
+
+  it('serializes concurrent direct sales and rejects damaged or retired unsold units', async () => {
+    const b = await batch(3);
+    const body = { reference: 'DIRECT-SALE', sold_at: new Date(Date.now() - 1000).toISOString() };
+    const results = await Promise.all([
+      call('POST', `/api/v1/admin/qr-codes/${b.qr[0].id}/sales`, body, { version: 1 }),
+      call('POST', `/api/v1/admin/qr-codes/${b.qr[0].id}/sales`, body, { version: 1 }),
+    ]);
+    expect(results.map((result) => result.status).sort()).toEqual([201, 412]);
+    await call(
+      'PATCH',
+      `/api/v1/admin/qr-codes/${b.qr[1].id}/stock`,
+      { stock_status: 'DAMAGED', reason: 'Print failed' },
+      { version: 1 },
+    );
+    await call(
+      'POST',
+      `/api/v1/admin/qr-codes/${b.qr[2].id}/retire`,
+      { reason: 'Not in use' },
+      { version: 1 },
+    );
+    for (const qr of b.qr.slice(1))
+      expect(
+        (await call('POST', `/api/v1/admin/qr-codes/${qr.id}/sales`, body, { version: 2 })).error
+          .code,
+      ).toBe('STOCK_TRANSITION_INVALID');
+    expect(
+      (await db.pool.query('SELECT count(*) FROM qr_review.sales_records')).rows[0].count,
+    ).toBe('1');
+  });
+
   it('makes DAMAGED stock and RETIRED QR terminal without recycling a token', async () => {
     const { qr } = await batch();
     const q = qr[0],

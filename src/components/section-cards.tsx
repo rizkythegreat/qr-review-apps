@@ -24,11 +24,11 @@ export function SectionCards({ data }: { data: Dashboard }) {
       href: '/admin/qr-codes',
     },
     {
-      label: 'Siap dijual',
-      value: data.stock_counts.AVAILABLE,
+      label: 'Unit baru',
+      value: data.stock_counts.GENERATED,
       icon: PackageCheck,
-      note: 'Lolos QC dan tersedia di stok',
-      href: '/admin/qr-codes?stock_status=AVAILABLE',
+      note: 'Belum tercatat penjualannya',
+      href: '/admin/qr-codes?stock_status=GENERATED',
     },
     {
       label: 'QR aktif',

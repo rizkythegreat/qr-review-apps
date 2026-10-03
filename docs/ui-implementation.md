@@ -8,7 +8,7 @@ Tailwind CSS v4 dan komponen shadcn/ui dari registry resmi, preset Radix Nova. B
 
 ## Cakupan
 
-- Admin: login/logout Supabase, verifikasi allowlist, dashboard, pencarian/filter/paginasi QR, daftar/detail/buat batch, ekspor publik dan kode aktivasi terpisah, polling job, unduhan PNG/SVG/ZIP, QC stok, pencatatan penjualan, serta log aktivitas seluruh QR dengan filter QR/toko, tindakan, dan tanggal WIB.
+- Admin: login/logout Supabase, verifikasi allowlist, dashboard, pencarian/filter/paginasi QR, daftar/detail/buat batch, ekspor publik dan kode aktivasi terpisah, polling job, unduhan PNG/SVG/ZIP, penandaan stok rusak, pencatatan penjualan langsung tanpa tahap QC manual, serta log aktivitas seluruh QR dengan filter QR/toko, tindakan, dan tanggal WIB.
 - Publik: halaman awal, aktivasi sesuai status, validasi link dan PIN, hasil sukses, fallback resolver untuk QR tidak dikenal, belum terjual, suspend, retire, rate limit dan gangguan layanan.
 - Pemilik: token/link QR dan PIN, sesi cookie, profil toko, statistik kunjungan, uji tujuan, update dengan ETag/CSRF, ganti PIN, logout, sesi berakhir dan tampilan read-only ketika suspend.
 - Dukungan: reset PIN dan transfer dengan alasan/referensi verifikasi, claim melalui fragment yang segera dihapus, rotasi kode aktivasi, suspend/resume/retire dan audit.
@@ -16,12 +16,12 @@ Tailwind CSS v4 dan komponen shadcn/ui dari registry resmi, preset Radix Nova. B
 
 ## Verifikasi
 
-Build produksi, typecheck dan lint berhasil. Tes backend: 83 unit + 39 integrasi. [Laporan browser](../artifacts/ui-verification.json) merekam 20 skenario yang lulus tanpa error JavaScript; Chromium memakai viewport desktop 1440 × 1000 dan mobile 390 × 844. Log aktivitas juga diperiksa pada iPad 820 × 1180. Tes berjalan terhadap server Next.js produksi dengan database PostgreSQL sementara dan Auth simulasi yang memverifikasi signature JWT. Kredensial Supabase lokal tidak digunakan untuk mengubah data produksi saat pengujian. Login memakai akun Supabase asli tetap perlu dicoba oleh admin pada project tersebut.
+Build produksi, typecheck dan lint berhasil. Tes backend: 83 unit + 41 integrasi. [Laporan browser](../artifacts/ui-verification.json) merekam 20 skenario yang lulus tanpa error JavaScript; Chromium memakai viewport desktop 1440 × 1000 dan mobile 390 × 844. Log aktivitas juga diperiksa pada iPad 820 × 1180. Tes berjalan terhadap server Next.js produksi dengan database PostgreSQL sementara dan Auth simulasi yang memverifikasi signature JWT. Kredensial Supabase lokal tidak digunakan untuk mengubah data produksi saat pengujian. Login memakai akun Supabase asli tetap perlu dicoba oleh admin pada project tersebut.
 
 | Tahap / kebutuhan | Bukti browser                                                                                                                                                                            |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Admin             | Redirect halaman terlindungi, password salah, penolakan allowlist, dashboard kosong, buat batch, logout dan akses ditolak kembali                                                        |
-| Batch/produksi    | Paginasi 23 unit, pencarian token, ekspor ZIP publik dan kode terpisah, polling job latar belakang, decode PNG ke URL publik, unduh SVG, QC dan sale                                     |
+| Batch/produksi    | Paginasi 23 unit, pencarian token, ekspor ZIP publik dan kode terpisah, polling job latar belakang, decode PNG ke URL publik, unduh SVG, penjualan langsung tanpa QC manual              |
 | Aktivasi          | `/r/TOKEN` tetap menjadi alamat halaman, blok sebelum SOLD, error link review dan konfirmasi PIN tanpa kehilangan isian, kode dinormalisasi, PIN dengan nol awal                         |
 | Pemilik           | Cookie HTTPS, CSRF dan X-QR-If-Match, perubahan link langsung dipakai 302, HEAD tanpa hitungan, kunjungan durable, konflik version mempertahankan draft dan meminta refresh eksplisit    |
 | PIN/sesi          | Ganti PIN mencabut sesi, PIN lama ditolak, login PIN baru, logout, expiry mengembalikan login, lima kegagalan memberi countdown dan menonaktifkan submit                                 |

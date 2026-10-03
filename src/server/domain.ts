@@ -201,7 +201,7 @@ export class Domain {
   ) {
     let q = await getQr(db, id, false, true);
     checkVersion(q, ifMatch);
-    if (q.stock_status !== 'AVAILABLE' || q.status !== 'UNACTIVATED')
+    if (!['GENERATED', 'AVAILABLE'].includes(q.stock_status) || q.status !== 'UNACTIVATED')
       conflict('STOCK_TRANSITION_INVALID');
     const sale = (
       await db.query(

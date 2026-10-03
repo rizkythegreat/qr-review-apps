@@ -146,22 +146,17 @@ export function QrDetail({ id, initialTab = 'overview' }: { id: string; initialT
           {qr.status === 'UNACTIVATED' && ['GENERATED', 'AVAILABLE'].includes(qr.stock_status) && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Stok dan pemeriksaan kualitas</CardTitle>
+                <CardTitle className="text-base">Stok dan penjualan</CardTitle>
                 <CardDescription>
-                  Periksa hasil cetak sebelum menjual unit kepada toko.
+                  Catat penjualan untuk mengizinkan pemilik mengaktifkan QR.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-3">
-                {qr.stock_status === 'GENERATED' && (
-                  <StockAction qr={qr} etag={etag} target="AVAILABLE" />
-                )}
-                <StockAction qr={qr} etag={etag} target="DAMAGED" />
-                {qr.stock_status === 'AVAILABLE' && (
-                  <Button variant="outline" onClick={() => setTab('sales')}>
-                    <ShoppingBag />
-                    Catat penjualan
-                  </Button>
-                )}
+                <Button onClick={() => setTab('sales')}>
+                  <ShoppingBag />
+                  Catat penjualan
+                </Button>
+                <DamageAction qr={qr} etag={etag} />
               </CardContent>
             </Card>
           )}
@@ -257,20 +252,12 @@ function QrPreview({ qr }: { qr: AdminQr }) {
     </Card>
   );
 }
-function StockAction({
-  qr,
-  etag,
-  target,
-}: {
-  qr: AdminQr;
-  etag: string | null;
-  target: 'AVAILABLE' | 'DAMAGED';
-}) {
+function DamageAction({ qr, etag }: { qr: AdminQr; etag: string | null }) {
   const [open, setOpen] = useState(false);
   const [openedEtag, setOpenedEtag] = useState(etag);
   const api = useAdminApi();
   const queries = useQueryClient();
-  const action = useAction((body: { stock_status: 'AVAILABLE' | 'DAMAGED'; reason: string }) =>
+  const action = useAction((body: { stock_status: 'DAMAGED'; reason: string }) =>
     api<AdminQr>(`/api/v1/admin/qr-codes/${qr.id}/stock`, {
       method: 'PATCH',
       body,
@@ -280,16 +267,12 @@ function StockAction({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const result = await action.run({
-      stock_status: target,
+      stock_status: 'DAMAGED',
       reason: String(new FormData(event.currentTarget).get('reason')).trim(),
     });
     if (!result) return;
     setOpen(false);
-    toast.success(
-      target === 'AVAILABLE'
-        ? 'Unit siap dijual.'
-        : 'Unit ditandai rusak dan tidak lagi digunakan.',
-    );
+    toast.success('Unit ditandai rusak dan tidak lagi digunakan.');
     void queries.invalidateQueries({ queryKey: ['admin'] });
   }
   return (
@@ -304,27 +287,24 @@ function StockAction({
       }}
     >
       <DialogTrigger asChild>
-        <Button variant={target === 'DAMAGED' ? 'outline' : 'default'}>
+        <Button variant="outline">
           <ClipboardCheck />
-          {target === 'AVAILABLE' ? 'Lolos QC · siap dijual' : 'Tandai rusak'}
+          Tandai rusak
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {target === 'AVAILABLE' ? 'Tandai unit siap dijual' : 'Tandai unit rusak'}
-          </DialogTitle>
+          <DialogTitle>Tandai unit rusak</DialogTitle>
           <DialogDescription>
-            {target === 'AVAILABLE'
-              ? 'Pastikan QR dapat dipindai dan hasil produksi layak diberikan kepada toko.'
-              : 'Unit akan dinonaktifkan dan tidak dapat dijual atau diaktifkan. Paket kode batch juga tidak lagi berlaku.'}
+            Unit akan dinonaktifkan dan tidak dapat dijual atau diaktifkan. Paket kode batch juga
+            tidak lagi berlaku.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
           <div className="grid gap-2">
-            <Label htmlFor={`stock-reason-${target}`}>Catatan pemeriksaan</Label>
+            <Label htmlFor="stock-reason-damaged">Catatan pemeriksaan</Label>
             <Textarea
-              id={`stock-reason-${target}`}
+              id="stock-reason-damaged"
               name="reason"
               minLength={5}
               maxLength={500}
@@ -333,9 +313,7 @@ function StockAction({
             />
           </div>
           <FormError error={action.error} />
-          <SubmitButton pending={action.pending}>
-            {target === 'AVAILABLE' ? 'Konfirmasi siap dijual' : 'Konfirmasi unit rusak'}
-          </SubmitButton>
+          <SubmitButton pending={action.pending}>Konfirmasi unit rusak</SubmitButton>
         </form>
       </DialogContent>
     </Dialog>
@@ -343,13 +321,13 @@ function StockAction({
 }
 function Sales({ qr, etag }: { qr: AdminQr; etag: string | null }) {
   if (qr.stock_status === 'SOLD') return <SaleInformation qrId={qr.id} />;
-  if (qr.stock_status !== 'AVAILABLE' || qr.status !== 'UNACTIVATED')
+  if (!['GENERATED', 'AVAILABLE'].includes(qr.stock_status) || qr.status !== 'UNACTIVATED')
     return (
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Penjualan belum tersedia</CardTitle>
           <CardDescription>
-            Unit harus lolos QC dan berstatus siap dijual sebelum penjualan dicatat.
+            Penjualan hanya dapat dicatat untuk unit baru atau siap dijual yang belum diaktifkan.
           </CardDescription>
         </CardHeader>
       </Card>

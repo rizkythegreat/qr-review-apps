@@ -649,7 +649,7 @@ paths:
   /api/v1/admin/qr-codes/{qr_id}/stock:
     patch:
       operationId: updateStock
-      summary: Catat QC tersedia atau rusak
+      summary: Tandai stok tersedia atau rusak
       description: 'GENERATED → AVAILABLE atau DAMAGED; AVAILABLE → DAMAGED. QR harus UNACTIVATED. DAMAGED terminal
         untuk stok, SOLD tidak dapat diubah di sini. Pada DAMAGED server juga mengubah QR ke RETIRED dan mencabut
         kode; semua dilakukan atomik. Tindakan ke status yang sama: 409 STOCK_TRANSITION_INVALID.'
@@ -720,7 +720,7 @@ paths:
     post:
       operationId: recordSale
       summary: Catat unit terjual
-      description: Hanya AVAILABLE + UNACTIVATED. Create sale dan ubah stok SOLD dalam transaksi. Satu sale per
+      description: QR harus UNACTIVATED dengan stok GENERATED atau AVAILABLE. Tahap QC manual tidak diperlukan. Create sale dan ubah stok SOLD dalam transaksi. Satu sale per
         QR pada MVP. Reference boleh sama untuk beberapa unit satu transaksi. sold_at tidak boleh di masa depan.
         Retry idem replay dilakukan sebelum evaluasi If-Match. Tidak ada payment gateway.
       tags:

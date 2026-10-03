@@ -1,12 +1,12 @@
 {
-  "verified_at": "2026-10-03T05:59:21.958Z",
+  "verified_at": "2026-10-03T06:54:29.232Z",
   "runtime": "Real production Next.js, temporary local PostgreSQL, signature-verified Auth simulation, Chromium desktop and mobile",
   "checks": [
     "Admin login, invalid credentials/allowlist, protected-route redirect and empty dashboard",
     "Create batch: committed response lost, identical retry, one batch only",
     "Separate public/secret exports, background polling, ZIP download and PNG decode",
     "QR search and cursor pagination",
-    "Activation blocked before sale, QC, recorded sale and SVG download",
+    "Activation blocked before sale, direct sale without manual QC, recorded sale and SVG download",
     "Printed /r URL renders activation, link/PIN field validation, leading-zero PIN",
     "Owner cookie login, CSRF/ETag profile update, immediate resolver redirect, HEAD, visits",
     "Version conflict preserves draft, explicit refresh, long store name fits mobile",

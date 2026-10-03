@@ -1,6 +1,6 @@
 export const auditActions: Record<string, string> = {
   BATCH_GENERATED: 'Unit dibuat',
-  STOCK_AVAILABLE: 'Lolos QC',
+  STOCK_AVAILABLE: 'Unit siap dijual',
   STOCK_DAMAGED: 'Unit rusak',
   SALE_RECORDED: 'Penjualan tercatat',
   ACTIVATED: 'QR diaktifkan',

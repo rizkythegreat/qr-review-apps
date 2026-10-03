@@ -38,7 +38,7 @@ Daftarkan user email/password admin di Supabase Auth terlebih dahulu dan tambahk
 Setelah server dan worker berjalan, gunakan urutan berikut:
 
 1. Buka `/admin`, buat batch, lalu siapkan dan unduh ZIP QR publik serta ZIP kode aktivasi secara terpisah.
-2. Buka detail QR, tandai lolos QC, lalu catat penjualan.
+2. Buka detail QR dan langsung catat penjualan; tahap lolos QC manual disembunyikan.
 3. Pindai QR atau buka `/r/TOKEN`. Pemilik mengisi kode aktivasi, nama toko, link review Google dan PIN empat digit.
 4. Pemilik membuka `/manage` menggunakan token dan PIN untuk memperbarui link, melihat kunjungan atau mengganti PIN.
 5. Admin menggunakan tab Dukungan di detail QR untuk reset PIN, transfer, rotasi kode, suspend/resume atau penonaktifan permanen. Bantuan penggunaan tersedia di `/help`.
@@ -73,7 +73,7 @@ Mutasi yang ditandai kontrak memerlukan UUID `Idempotency-Key`. Retry jaringan m
 
 Gunakan ETag dari GET QR admin atau GET `/owner/me` sebagai `If-Match`, misalnya `"v3"`. Mutasi pemilik memerlukan cookie sesi, `Origin` persis `PUBLIC_ORIGIN`, dan `X-CSRF-Token` dari login atau GET `/owner/me`. Aktivasi dan claim grant juga memerlukan Origin, dan tidak otomatis membuat sesi. Setelah berhasil, pemilik login lewat `/api/v1/owner/sessions`.
 
-Alur produksi: buat batch → ekspor publik/rahasia → QC `AVAILABLE` → catat penjualan `SOLD` → aktivasi dengan kode dan PIN. Dukungan reset/transfer memerlukan alasan dan referensi verifikasi oleh admin; pemeriksaan bukti dilakukan di luar aplikasi. Link claim memuat secret pada fragment, bukan query. UI menghapus fragment sebelum inisialisasi Auth, menyimpan grant hanya di memori halaman, lalu mengirimnya melalui POST. Membuka ulang halaman tanpa fragment memerlukan tautan lengkap dari admin.
+Alur produksi: buat batch → ekspor publik/rahasia → langsung catat penjualan `SOLD` dari `GENERATED` atau `AVAILABLE` → aktivasi dengan kode dan PIN. Dukungan reset/transfer memerlukan alasan dan referensi verifikasi oleh admin; pemeriksaan bukti dilakukan di luar aplikasi. Link claim memuat secret pada fragment, bukan query. UI menghapus fragment sebelum inisialisasi Auth, menyimpan grant hanya di memori halaman, lalu mengirimnya melalui POST. Membuka ulang halaman tanpa fragment memerlukan tautan lengkap dari admin.
 
 Rincian endpoint, payload, kode error, serta aturan bisnis tetap merujuk OpenAPI. [Pemetaan implementasi dan pengujian](docs/implementation.md) menjelaskan bukti backend untuk setiap acceptance criterion. [Runbook deployment dan pemulihan](docs/operations.md) memuat pengaturan worker, monitoring, serta backup.
 

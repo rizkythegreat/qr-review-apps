@@ -145,7 +145,7 @@ export const qrLabels: Record<QrStatus, string> = {
   RETIRED: 'Tidak digunakan',
 };
 export const stockLabels: Record<StockStatus, string> = {
-  GENERATED: 'Menunggu QC',
+  GENERATED: 'Unit baru',
   AVAILABLE: 'Siap dijual',
   SOLD: 'Terjual',
   DAMAGED: 'Rusak',
