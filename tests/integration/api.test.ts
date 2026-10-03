@@ -1024,6 +1024,82 @@ describe('activation, owner sessions and resolver', () => {
   });
 });
 
+describe('manual fresh start SQL', () => {
+  it('resets all operational data atomically while preserving admin access and database structure', async () => {
+    const b = await active();
+    await login(b.q.token);
+    await call(
+      'POST',
+      `/api/v1/admin/qr-codes/${b.q.id}/pin-reset-grants`,
+      { reason: 'Verified reset request', verification_reference: 'RESET-TEST' },
+      { version: b.q.version },
+    );
+    await call('POST', `/api/v1/admin/batches/${b.batch.id}/exports`, { kind: 'PUBLIC_QR' });
+    await resolve(b.q.token, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const tables = [
+      'scan_events',
+      'audit_events',
+      'owner_sessions',
+      'support_grants',
+      'sales_records',
+      'idempotency_records',
+      'export_jobs',
+      'qr_codes',
+      'ownership_periods',
+      'qr_batches',
+      'rate_limits',
+    ];
+    const counts = async () =>
+      Promise.all(
+        tables.map(async (table) =>
+          Number((await db.pool.query(`SELECT count(*) FROM qr_review.${table}`)).rows[0].count),
+        ),
+      );
+    const before = await counts();
+    expect(before.every((count) => count > 0)).toBe(true);
+    const migrations = (
+      await db.pool.query('SELECT name,checksum FROM qr_review.schema_migrations ORDER BY name')
+    ).rows;
+    const sql = readFileSync('scripts/sql/reset-app-data.sql', 'utf8');
+    const connection = await db.pool.connect();
+    try {
+      // A rollback restores all tables, even with the circular ownership foreign key.
+      await connection.query(sql.replace('\nCOMMIT;', '\nROLLBACK;'));
+      expect(await counts()).toEqual(before);
+      await connection.query(sql);
+    } finally {
+      await connection.query('ROLLBACK');
+      connection.release();
+    }
+    expect(await counts()).toEqual(tables.map(() => 0));
+    expect(
+      (await db.pool.query('SELECT name,checksum FROM qr_review.schema_migrations ORDER BY name'))
+        .rows,
+    ).toEqual(migrations);
+    expect((await call('GET', '/api/v1/admin/me')).status).toBe(200);
+    expect((await call('GET', '/api/v1/admin/dashboard')).data.total_units).toBe(0);
+    expect(
+      (
+        await db.pool.query(
+          `SELECT relrowsecurity FROM pg_class WHERE oid='qr_review.qr_codes'::regclass`,
+        )
+      ).rows[0].relrowsecurity,
+    ).toBe(true);
+    expect(
+      (
+        await db.pool.query(
+          `SELECT tgenabled FROM pg_trigger WHERE tgrelid='qr_review.qr_codes'::regclass AND tgname='immutable_qr'`,
+        )
+      ).rows[0].tgenabled,
+    ).toBe('O');
+    const fresh = await batch();
+    expect(fresh.qr).toHaveLength(1);
+    await expect(
+      db.pool.query('DELETE FROM qr_review.qr_codes WHERE id=$1', [fresh.qr[0].id]),
+    ).rejects.toThrow('QR units cannot be deleted');
+  });
+});
+
 describe('global admin activity', () => {
   it('requires an authenticated allowlisted admin', async () => {
     expect(
