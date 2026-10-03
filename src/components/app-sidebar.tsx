@@ -2,6 +2,7 @@
 
 // Adapted from the official shadcn/ui dashboard-01 block.
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { ComponentProps } from 'react';
 import { LayoutDashboard, Package, QrCode, ShieldQuestion, CircleHelp } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
@@ -22,6 +23,7 @@ import { useAdminAuth } from '@/components/providers';
 
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
   const { session } = useAdminAuth();
+  const pathname = usePathname();
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="py-5">
@@ -59,7 +61,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Panduan penggunaan">
-                  <Link href="/help">
+                  <Link href={{ pathname: '/help', query: { returnTo: pathname } }}>
                     <CircleHelp />
                     <span>Panduan penggunaan</span>
                   </Link>

@@ -12,9 +12,19 @@ import {
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Panduan dan bantuan' };
-export default function HelpPage() {
+export default async function HelpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returnTo?: string | string[] }>;
+}) {
+  const { returnTo } = await searchParams;
+  const back =
+    typeof returnTo === 'string' && /^\/admin(?:\/[a-zA-Z0-9/_-]*)?$/.test(returnTo)
+      ? returnTo
+      : '/';
+
   return (
-    <PublicShell wide back="/">
+    <PublicShell wide back={back}>
       <div className="mb-8">
         <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Panduan penggunaan
